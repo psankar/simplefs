@@ -1,1 +1,9 @@
 A simple filesystem to understand things.
+
+This is a Work In Progress. Do not use this yet.
+
+The source files are licensed under Creative Commons Zero License.
+More information at:	http://creativecommons.org/publicdomain/zero/1.0/
+Full license text at:	http://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+To compile, install linux kernel sources and run make from the checkedout directory.
