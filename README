@@ -22,23 +22,18 @@ Repeat everytime after making changes to the source:
 
 linux-okb0:/home/psankar/src/simplefs > make
 linux-okb0:/home/psankar/src/simplefs > su - ; # switch to root user if not already, or use sudo
+
+linux-okb0:/home/psankar/src/simplefs # dmesg -c
+linux-okb0:/home/psankar/src/simplefs # insmod simplefs.ko ; mount -o loop -t simplefs image /home/psankar/src/simplefs/mount/ ; dmesg
+[ 5788.269663] Sucessfully registered simplefs
+[ 5788.274803] simplefs is succesfully mounted on [/dev/loop2]
+linux-okb0:/home/psankar/src/simplefs # cd mount/
+linux-okb0:/home/psankar/src/simplefs/mount # ls
+linux-okb0:/home/psankar/src/simplefs/mount # cd ..
+linux-okb0:/home/psankar/src/simplefs # umount mount ; rmmod simplefs.ko
 linux-okb0:/home/psankar/src/simplefs # dmesg
-linux-okb0:/home/psankar/src/simplefs # insmod simplefs.ko
-linux-okb0:/home/psankar/src/simplefs # dmesg
-[ 7467.426112] Sucessfully registered simplefs
-linux-okb0:/home/psankar/src/simplefs # mount -o loop -t simplefs image /home/psankar/src/simplefs/mount/
-linux-okb0:/home/psankar/src/simplefs # dmesg
-[ 7467.426112] Sucessfully registered simplefs
-[ 7478.223432] simplefs is succesfully mounted on [/dev/loop1]
-linux-okb0:/home/psankar/src/simplefs # umount /home/psankar/src/simplefs/mount/
-linux-okb0:/home/psankar/src/simplefs # dmesg
-[ 7467.426112] Sucessfully registered simplefs
-[ 7478.223432] simplefs is succesfully mounted on [/dev/loop1]
-[ 7498.889439] simplefs superblock is destroyed. Unmount succesful.
-linux-okb0:/home/psankar/src/simplefs # rmmod simplefs.ko
-linux-okb0:/home/psankar/src/simplefs # dmesg
-[ 7467.426112] Sucessfully registered simplefs
-[ 7478.223432] simplefs is succesfully mounted on [/dev/loop1]
-[ 7498.889439] simplefs superblock is destroyed. Unmount succesful.
-[ 7506.906067] Sucessfully unregistered simplefs
+[ 5788.269663] Sucessfully registered simplefs
+[ 5788.274803] simplefs is succesfully mounted on [/dev/loop2]
+[ 5814.008604] simplefs superblock is destroyed. Unmount succesful.
+[ 5814.014065] Sucessfully unregistered simplefs
 linux-okb0:/home/psankar/src/simplefs #

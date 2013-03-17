@@ -9,6 +9,31 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 
+static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
+{
+	/* ls will list nothing as of now.
+	 * Basic skeleton code to make ls (readdir) work for simplefs */
+	return 0;
+}
+
+const struct file_operations simplefs_dir_operations = {
+	.owner = THIS_MODULE,
+	.readdir = simplefs_readdir,
+};
+
+struct dentry *simplefs_lookup(struct inode *parent_inode,
+			       struct dentry *child_dentry, unsigned int flags)
+{
+	/* The lookup function is used for dentry association.
+	 * As of now, we don't deal with dentries in simplefs.
+	 * So we will keep this simple for now and revisit later */
+	return NULL;
+}
+
+static struct inode_operations simplefs_inode_ops = {
+	.lookup = simplefs_lookup,
+};
+
 /* This function creates, configures and returns an inode,
  * for the asked file (or) directory (differentiated by the mode param),
  * under the directory specified by the dir param
@@ -54,6 +79,8 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_magic = 0x10032013;
 
 	inode = simplefs_get_inode(sb, NULL, S_IFDIR, 0);
+	inode->i_op = &simplefs_inode_ops;
+	inode->i_fop = &simplefs_dir_operations;
 	sb->s_root = d_make_root(inode);
 	if (!sb->s_root)
 		return -ENOMEM;
