@@ -9,6 +9,8 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 
+#include "simple.h"
+
 static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
 	/* ls will list nothing as of now.
@@ -76,7 +78,7 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 	struct inode *inode;
 
 	/* A magic number that uniquely identifies our filesystem type */
-	sb->s_magic = 0x10032013;
+	sb->s_magic = SIMPLEFS_MAGIC;
 
 	inode = simplefs_get_inode(sb, NULL, S_IFDIR, 0);
 	inode->i_op = &simplefs_inode_ops;

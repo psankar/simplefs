@@ -15,7 +15,7 @@ To test:
 
 One-time-activity:
 
-linux-okb0:/home/psankar/src/simplefs > dd bs=1M count=100 if=/dev/zero of=image
+linux-okb0:/home/psankar/src/simplefs > dd bs=4096 count=100 if=/dev/zero of=image
 linux-okb0:/home/psankar/src/simplefs > mkdir mount
 
 Repeat everytime after making changes to the source:
@@ -23,17 +23,14 @@ Repeat everytime after making changes to the source:
 linux-okb0:/home/psankar/src/simplefs > make
 linux-okb0:/home/psankar/src/simplefs > su - ; # switch to root user if not already, or use sudo
 
-linux-okb0:/home/psankar/src/simplefs # dmesg -c
-linux-okb0:/home/psankar/src/simplefs # insmod simplefs.ko ; mount -o loop -t simplefs image /home/psankar/src/simplefs/mount/ ; dmesg
-[ 5788.269663] Sucessfully registered simplefs
-[ 5788.274803] simplefs is succesfully mounted on [/dev/loop2]
-linux-okb0:/home/psankar/src/simplefs # cd mount/
-linux-okb0:/home/psankar/src/simplefs/mount # ls
-linux-okb0:/home/psankar/src/simplefs/mount # cd ..
-linux-okb0:/home/psankar/src/simplefs # umount mount ; rmmod simplefs.ko
-linux-okb0:/home/psankar/src/simplefs # dmesg
-[ 5788.269663] Sucessfully registered simplefs
-[ 5788.274803] simplefs is succesfully mounted on [/dev/loop2]
-[ 5814.008604] simplefs superblock is destroyed. Unmount succesful.
-[ 5814.014065] Sucessfully unregistered simplefs
+# Creating a loop back device and formatting it with our shiny, brand new simplefs
+
+linux-okb0:/home/psankar/src/simplefs # losetup /dev/loop0
+losetup: /dev/loop0: No such file or directory
+linux-okb0:/home/psankar/src/simplefs # losetup /dev/loop0 image
+linux-okb0:/home/psankar/src/simplefs # ./mkfs-simplefs /dev/loop0
+Super block written succesfully
+linux-okb0:/home/psankar/src/simplefs # losetup -d /dev/loop0
+linux-okb0:/home/psankar/src/simplefs # losetup /dev/loop0
+losetup: /dev/loop0: No such file or directory
 linux-okb0:/home/psankar/src/simplefs #
