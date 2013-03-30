@@ -33,10 +33,10 @@ int main(int argc, char *argv[])
 	/* Just a redundant check. Not required ideally. */
 	if (ret != SIMPLEFS_DEFAULT_BLOCK_SIZE)
 		printf
-		    ("bytes written [%d] are not equal to the default block size",
+		    ("bytes written [%d] are not equal to the default block size\n",
 		     (int)ret);
 	else
-		printf("Super block written succesfully");
+		printf("Super block written succesfully\n");
 
 	close(fd);
 

@@ -13,24 +13,12 @@ install linux kernel sources and run make from the checkedout directory.
 To test:
 ---------
 
-One-time-activity:
 
-linux-okb0:/home/psankar/src/simplefs > dd bs=4096 count=100 if=/dev/zero of=image
-linux-okb0:/home/psankar/src/simplefs > mkdir mount
-
-Repeat everytime after making changes to the source:
-
-linux-okb0:/home/psankar/src/simplefs > make
-linux-okb0:/home/psankar/src/simplefs > su - ; # switch to root user if not already, or use sudo
-
-# Creating a loop back device and formatting it with our shiny, brand new simplefs
-
-linux-okb0:/home/psankar/src/simplefs # losetup /dev/loop0
-losetup: /dev/loop0: No such file or directory
-linux-okb0:/home/psankar/src/simplefs # losetup /dev/loop0 image
-linux-okb0:/home/psankar/src/simplefs # ./mkfs-simplefs /dev/loop0
+~/src/simplefs> make
+~/src/simplefs> dd bs=4096 count=100 if=/dev/zero of=image
+100+0 records in
+100+0 records out
+409600 bytes (410 kB) copied, 0.00175839 s, 233 MB/s
+~/src/simplefs> ./mkfs-simplefs image
 Super block written succesfully
-linux-okb0:/home/psankar/src/simplefs # losetup -d /dev/loop0
-linux-okb0:/home/psankar/src/simplefs # losetup /dev/loop0
-losetup: /dev/loop0: No such file or directory
-linux-okb0:/home/psankar/src/simplefs #
+~/src/simplefs>
