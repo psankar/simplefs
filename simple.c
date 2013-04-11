@@ -8,6 +8,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/fs.h>
+#include <linux/buffer_head.h>
 
 #include "simple.h"
 
@@ -76,6 +77,31 @@ struct inode *simplefs_get_inode(struct super_block *sb,
 int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct inode *inode;
+	struct buffer_head *bh;
+	struct simplefs_super_block *sb_disk;
+
+	bh = (struct buffer_head *)sb_bread(sb, 0);
+
+	sb_disk = (struct simplefs_super_block *)bh->b_data;
+
+	printk(KERN_INFO "The magic number obtained in disk is: [%d]\n",
+	       sb_disk->magic);
+
+	if (unlikely(sb_disk->magic != SIMPLEFS_MAGIC)) {
+		printk(KERN_ERR
+		       "The filesystem that you try to mount is not of type simplefs. Magicnumber mismatch.");
+		return -EPERM;
+	}
+
+	if (unlikely(sb_disk->block_size != SIMPLEFS_DEFAULT_BLOCK_SIZE)) {
+		printk(KERN_ERR
+		       "simplefs seem to be formatted using a non-standard block size.");
+		return -EPERM;
+	}
+
+	printk(KERN_INFO
+	       "simplefs filesystem of version [%d] formatted with a block size of [%d] detected in the device.\n",
+	       sb_disk->version, sb_disk->block_size);
 
 	/* A magic number that uniquely identifies our filesystem type */
 	sb->s_magic = SIMPLEFS_MAGIC;

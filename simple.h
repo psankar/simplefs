@@ -7,5 +7,5 @@ struct simplefs_super_block {
 	unsigned int block_size;
 	unsigned int free_blocks;
 
-	char padding[ (4 * 1024) - (4 * sizeof(unsigned int))];
+	char padding[(4 * 1024) - (4 * sizeof(unsigned int))];
 };

@@ -21,4 +21,23 @@ To test:
 409600 bytes (410 kB) copied, 0.00175839 s, 233 MB/s
 ~/src/simplefs> ./mkfs-simplefs image
 Super block written succesfully
-~/src/simplefs>
+
+# switch to root user (or use with sudo)
+
+linux-okb0:/home/psankar/src/simplefs # insmod simplefs.ko
+linux-okb0:/home/psankar/src/simplefs # dmesg
+[ 2963.323701] Sucessfully registered simplefs
+linux-okb0:/home/psankar/src/simplefs # mount -o loop -t simplefs image /home/psankar/src/simplefs/mount/
+linux-okb0:/home/psankar/src/simplefs # dmesg
+[ 2963.323701] Sucessfully registered simplefs
+[ 2977.453535] The magic number obtained in disk is: [268640275]
+[ 2977.453544] simplefs filesystem of version [1] formatted with a block size of [4096] detected in the device.
+[ 2977.453551] simplefs is succesfully mounted on [/dev/loop1]
+linux-okb0:/home/psankar/src/simplefs # umount mount/
+linux-okb0:/home/psankar/src/simplefs # dmesg
+[ 2963.323701] Sucessfully registered simplefs
+[ 2977.453535] The magic number obtained in disk is: [268640275]
+[ 2977.453544] simplefs filesystem of version [1] formatted with a block size of [4096] detected in the device.
+[ 2977.453551] simplefs is succesfully mounted on [/dev/loop1]
+[ 2994.184508] simplefs superblock is destroyed. Unmount succesful.
+linux-okb0:/home/psankar/src/simplefs # rmmod simplefs.ko
