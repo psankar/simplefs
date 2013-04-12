@@ -1,6 +1,7 @@
 # simplefs specific files
 image
 mount
+mkfs-simplefs
 
 
 #
