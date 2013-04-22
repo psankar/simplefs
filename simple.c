@@ -23,7 +23,12 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	struct simplefs_dir_record *record;
 	int i;
 
-	printk(KERN_INFO "We are inside readdir. The pos[%lld], inode number[%lu], superblock magic [%lu]\n", pos, inode->i_ino, sb->s_magic);
+	printk(KERN_INFO "We are inside readdir. The pos[%lld], inode number[%lu], superblock magic [%lu] inodesize [%lld]\n", pos, inode->i_ino, sb->s_magic, inode->i_size);
+
+	if (pos) {
+		printk(KERN_INFO "pos seem to be non-zero which means we have already filled in all the details\n");
+		return 0;
+	}
 
 	sfs_inode = SIMPLEFS_INODE(inode);
 
@@ -38,11 +43,12 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	for (i=0; i < sfs_inode->dir_children_count; i++) {
 		printk(KERN_INFO "Got filename: %s\n", record->filename);
 		filldir(dirent, record->filename, SIMPLEFS_FILENAME_MAXLEN, pos, record->inode_no, DT_UNKNOWN);
+		filp->f_pos += sizeof(struct simplefs_dir_record);
 		pos += sizeof(struct simplefs_dir_record);
 		record ++;
 	}
 
-	return 1;
+	return 0;
 }
 
 const struct file_operations simplefs_dir_operations = {
