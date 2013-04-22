@@ -21,23 +21,46 @@ To test:
 409600 bytes (410 kB) copied, 0.00175839 s, 233 MB/s
 ~/src/simplefs> ./mkfs-simplefs image
 Super block written succesfully
+root directory inode written succesfully
+welcomefile inode written succesfully
+inode store padding bytes (after the two inodes) written sucessfully
+root directory datablocks (name+inode_no pair for welcomefile) written succesfully
+padding after the rootdirectory children written succesfully
+welcomefilebody has been written succesfully
+~/src/simplefs>
 
 # switch to root user (or use with sudo)
-
-linux-okb0:/home/psankar/src/simplefs # insmod simplefs.ko
-linux-okb0:/home/psankar/src/simplefs # dmesg
-[ 2963.323701] Sucessfully registered simplefs
-linux-okb0:/home/psankar/src/simplefs # mount -o loop -t simplefs image /home/psankar/src/simplefs/mount/
-linux-okb0:/home/psankar/src/simplefs # dmesg
-[ 2963.323701] Sucessfully registered simplefs
-[ 2977.453535] The magic number obtained in disk is: [268640275]
-[ 2977.453544] simplefs filesystem of version [1] formatted with a block size of [4096] detected in the device.
-[ 2977.453551] simplefs is succesfully mounted on [/dev/loop1]
-linux-okb0:/home/psankar/src/simplefs # umount mount/
-linux-okb0:/home/psankar/src/simplefs # dmesg
-[ 2963.323701] Sucessfully registered simplefs
-[ 2977.453535] The magic number obtained in disk is: [268640275]
-[ 2977.453544] simplefs filesystem of version [1] formatted with a block size of [4096] detected in the device.
-[ 2977.453551] simplefs is succesfully mounted on [/dev/loop1]
-[ 2994.184508] simplefs superblock is destroyed. Unmount succesful.
+linux-okb0:/home/psankar/src/simplefs # dmesg -c
+linux-okb0:/home/psankar/src/simplefs # insmod simplefs.ko;mount -o loop -t simplefs image /home/psankar/src/simplefs/mount/;dmesg
+[15446.634827] Sucessfully registered simplefs
+[15446.650771] The magic number obtained in disk is: [268640275]
+[15446.650775] simplefs filesystem of version [1] formatted with a block size of [4096] detected in the device.
+[15446.650789] simplefs is succesfully mounted on [/dev/loop12]
+linux-okb0:/home/psankar/src/simplefs # cd mount/
+linux-okb0:/home/psankar/src/simplefs/mount # ls
+ls: cannot access vanakkam: No such file or directory
+vanakkam
+linux-okb0:/home/psankar/src/simplefs/mount # dmesg
+[15446.634827] Sucessfully registered simplefs
+[15446.650771] The magic number obtained in disk is: [268640275]
+[15446.650775] simplefs filesystem of version [1] formatted with a block size of [4096] detected in the device.
+[15446.650789] simplefs is succesfully mounted on [/dev/loop12]
+[15452.332645] We are inside readdir. The pos[0], inode number[1], superblock magic [268640275] inodesize [0]
+[15452.332658] Got filename: vanakkam
+[15452.332839] We are inside readdir. The pos[264], inode number[1], superblock magic [268640275] inodesize [0]
+[15452.332844] pos seem to be non-zero which means we have already filled in all the details
+linux-okb0:/home/psankar/src/simplefs/mount # cd ..
+linux-okb0:/home/psankar/src/simplefs # umount mount
 linux-okb0:/home/psankar/src/simplefs # rmmod simplefs.ko
+linux-okb0:/home/psankar/src/simplefs # dmesg
+[15446.634827] Sucessfully registered simplefs
+[15446.650771] The magic number obtained in disk is: [268640275]
+[15446.650775] simplefs filesystem of version [1] formatted with a block size of [4096] detected in the device.
+[15446.650789] simplefs is succesfully mounted on [/dev/loop12]
+[15452.332645] We are inside readdir. The pos[0], inode number[1], superblock magic [268640275] inodesize [0]
+[15452.332658] Got filename: vanakkam
+[15452.332839] We are inside readdir. The pos[264], inode number[1], superblock magic [268640275] inodesize [0]
+[15452.332844] pos seem to be non-zero which means we have already filled in all the details
+[15462.135603] simplefs superblock is destroyed. Unmount succesful.
+[15467.279797] Sucessfully unregistered simplefs
+linux-okb0:/home/psankar/src/simplefs #
