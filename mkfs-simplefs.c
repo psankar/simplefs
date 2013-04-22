@@ -1,10 +1,11 @@
-#include "simple.h"
-
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdint.h>
+
+#include "simple.h"
 
 int main(int argc, char *argv[])
 {
@@ -27,6 +28,11 @@ int main(int argc, char *argv[])
 	sb.magic = SIMPLEFS_MAGIC;
 	sb.block_size = SIMPLEFS_DEFAULT_BLOCK_SIZE;
 	sb.free_blocks = ~0;
+
+	sb.root_inode.mode = S_IFDIR;
+	sb.root_inode.inode_no = SIMPLEFS_ROOT_INODE_NUMBER;
+	sb.root_inode.data_block_number = SIMPLEFS_ROOTDIR_DATABLOCK_NUMBER;
+	sb.root_inode.dir_children_count = 0;
 
 	ret = write(fd, (char *)&sb, sizeof(sb));
 
