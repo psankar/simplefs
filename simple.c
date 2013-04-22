@@ -25,7 +25,7 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 	printk(KERN_INFO "We are inside readdir. The pos[%lld], inode number[%lu], superblock magic [%lu]\n", pos, inode->i_ino, sb->s_magic);
 
-	sfs_inode = inode->i_private;
+	sfs_inode = SIMPLEFS_INODE(inode);
 
 	if (unlikely(!S_ISDIR(sfs_inode->mode))) {
 		printk(KERN_ERR "inode %llu not a directory", sfs_inode->inode_no);
