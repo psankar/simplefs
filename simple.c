@@ -67,7 +67,7 @@ static struct inode_operations simplefs_inode_ops = {
  * from the inode store, if it exists. */
 struct simplefs_inode * simplefs_get_inode(struct super_block *sb, uint64_t inode_no)
 {
-	struct simplefs_super_block *sfs_sb = sb->s_fs_info;
+	struct simplefs_super_block *sfs_sb = SIMPLEFS_SB(sb);
 	struct simplefs_inode *sfs_inode = NULL;
 
 	int i;
