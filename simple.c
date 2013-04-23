@@ -33,18 +33,20 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	sfs_inode = SIMPLEFS_INODE(inode);
 
 	if (unlikely(!S_ISDIR(sfs_inode->mode))) {
-		printk(KERN_ERR "inode %llu not a directory", sfs_inode->inode_no);
+		printk(KERN_ERR "inode %llu not a directory",
+		       sfs_inode->inode_no);
 		return -ENOTDIR;
 	}
 
 	bh = (struct buffer_head *)sb_bread(sb, sfs_inode->data_block_number);
 
-	record = (struct simplefs_dir_record *) bh->b_data;
-	for (i=0; i < sfs_inode->dir_children_count; i++) {
-		filldir(dirent, record->filename, SIMPLEFS_FILENAME_MAXLEN, pos, record->inode_no, DT_UNKNOWN);
+	record = (struct simplefs_dir_record *)bh->b_data;
+	for (i = 0; i < sfs_inode->dir_children_count; i++) {
+		filldir(dirent, record->filename, SIMPLEFS_FILENAME_MAXLEN, pos,
+			record->inode_no, DT_UNKNOWN);
 		filp->f_pos += sizeof(struct simplefs_dir_record);
 		pos += sizeof(struct simplefs_dir_record);
-		record ++;
+		record++;
 	}
 
 	return 0;
@@ -52,7 +54,8 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 /* This functions returns a simplefs_inode with the given inode_no
  * from the inode store, if it exists. */
-struct simplefs_inode * simplefs_get_inode(struct super_block *sb, uint64_t inode_no)
+struct simplefs_inode *simplefs_get_inode(struct super_block *sb,
+					  uint64_t inode_no)
 {
 	struct simplefs_super_block *sfs_sb = SIMPLEFS_SB(sb);
 	struct simplefs_inode *sfs_inode = NULL;
@@ -63,10 +66,11 @@ struct simplefs_inode * simplefs_get_inode(struct super_block *sb, uint64_t inod
 	/* The inode store can be read once and kept in memory permanently while mounting.
 	 * But such a model will not be scalable in a filesystem with
 	 * millions or billions of files (inodes) */
-	bh = (struct buffer_head *)sb_bread(sb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
-	sfs_inode = (struct simplefs_inode *) bh->b_data;
+	bh = (struct buffer_head *)sb_bread(sb,
+					    SIMPLEFS_INODESTORE_BLOCK_NUMBER);
+	sfs_inode = (struct simplefs_inode *)bh->b_data;
 
-	for (i=0;i < sfs_sb->inodes_count; i++) {
+	for (i = 0; i < sfs_sb->inodes_count; i++) {
 		if (sfs_inode->inode_no == inode_no) {
 			/* FIXME: bh->b_data is probably leaking */
 			return sfs_inode;
@@ -99,8 +103,8 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 	int i;
 
 	bh = (struct buffer_head *)sb_bread(sb, parent->data_block_number);
-	record = (struct simplefs_dir_record *) bh->b_data;
-	for (i=0; i < parent->dir_children_count; i++) {
+	record = (struct simplefs_dir_record *)bh->b_data;
+	for (i = 0; i < parent->dir_children_count; i++) {
 		if (!strcmp(record->filename, child_dentry->d_name.name)) {
 
 			struct inode *inode;
@@ -118,7 +122,8 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 			inode->i_fop = &simplefs_dir_operations;
 
 			/* FIXME: We should store these times to disk and retrieve them */
-			inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+			inode->i_atime = inode->i_mtime = inode->i_ctime =
+			    CURRENT_TIME;
 
 			inode->i_private = sfs_inode;
 
@@ -138,7 +143,8 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 	struct buffer_head *bh;
 	struct simplefs_super_block *sb_disk;
 
-	bh = (struct buffer_head *)sb_bread(sb, SIMPLEFS_SUPERBLOCK_BLOCK_NUMBER);
+	bh = (struct buffer_head *)sb_bread(sb,
+					    SIMPLEFS_SUPERBLOCK_BLOCK_NUMBER);
 
 	sb_disk = (struct simplefs_super_block *)bh->b_data;
 	/* FIXME: bh->b_data is probably leaking */
@@ -174,9 +180,11 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 	root_inode->i_sb = sb;
 	root_inode->i_op = &simplefs_inode_ops;
 	root_inode->i_fop = &simplefs_dir_operations;
-	root_inode->i_atime = root_inode->i_mtime = root_inode->i_ctime = CURRENT_TIME;
+	root_inode->i_atime = root_inode->i_mtime = root_inode->i_ctime =
+	    CURRENT_TIME;
 
-	root_inode->i_private = simplefs_get_inode(sb, SIMPLEFS_ROOTDIR_INODE_NUMBER);
+	root_inode->i_private =
+	    simplefs_get_inode(sb, SIMPLEFS_ROOTDIR_INODE_NUMBER);
 
 	sb->s_root = d_make_root(root_inode);
 	if (!sb->s_root)

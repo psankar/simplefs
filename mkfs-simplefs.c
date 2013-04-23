@@ -67,7 +67,8 @@ int main(int argc, char *argv[])
 	ret = write(fd, (char *)&root_inode, sizeof(root_inode));
 
 	if (ret != sizeof(root_inode)) {
-		printf("The inode store was not written properly. Retry your mkfs\n");
+		printf
+		    ("The inode store was not written properly. Retry your mkfs\n");
 		ret = -1;
 		goto exit;
 	}
@@ -80,23 +81,28 @@ int main(int argc, char *argv[])
 	ret = write(fd, (char *)&welcomefile_inode, sizeof(root_inode));
 
 	if (ret != sizeof(root_inode)) {
-		printf("The welcomefile inode was not written properly. Retry your mkfs\n");
+		printf
+		    ("The welcomefile inode was not written properly. Retry your mkfs\n");
 		ret = -1;
 		goto exit;
 	}
 	printf("welcomefile inode written succesfully\n");
 
-	nbytes = SIMPLEFS_DEFAULT_BLOCK_SIZE - sizeof(root_inode) - sizeof(welcomefile_inode);
+	nbytes =
+	    SIMPLEFS_DEFAULT_BLOCK_SIZE - sizeof(root_inode) -
+	    sizeof(welcomefile_inode);
 	block_padding = malloc(nbytes);
-	
+
 	ret = write(fd, block_padding, nbytes);
 
 	if (ret != nbytes) {
-		printf("The padding bytes are not written properly. Retry your mkfs\n");
+		printf
+		    ("The padding bytes are not written properly. Retry your mkfs\n");
 		ret = -1;
 		goto exit;
 	}
-	printf("inode store padding bytes (after the two inodes) written sucessfully\n");
+	printf
+	    ("inode store padding bytes (after the two inodes) written sucessfully\n");
 
 	strcpy(record.filename, welcomefile_name);
 	record.inode_no = WELCOMEFILE_INODE_NUMBER;
@@ -104,22 +110,26 @@ int main(int argc, char *argv[])
 
 	ret = write(fd, (char *)&record, nbytes);
 	if (ret != nbytes) {
-		printf("Writing the rootdirectory datablock (name+inode_no pair for welcomefile) has failed\n");
+		printf
+		    ("Writing the rootdirectory datablock (name+inode_no pair for welcomefile) has failed\n");
 		ret = -1;
 		goto exit;
 	}
-	printf("root directory datablocks (name+inode_no pair for welcomefile) written succesfully\n");
+	printf
+	    ("root directory datablocks (name+inode_no pair for welcomefile) written succesfully\n");
 
 	nbytes = SIMPLEFS_DEFAULT_BLOCK_SIZE - sizeof(record);
 	block_padding = realloc(block_padding, nbytes);
 
 	ret = write(fd, block_padding, nbytes);
 	if (ret != nbytes) {
-		printf("Writing the padding for rootdirectory children datablock has failed\n");
+		printf
+		    ("Writing the padding for rootdirectory children datablock has failed\n");
 		ret = -1;
 		goto exit;
 	}
-	printf("padding after the rootdirectory children written succesfully\n");
+	printf
+	    ("padding after the rootdirectory children written succesfully\n");
 
 	nbytes = sizeof(welcomefile_body);
 	ret = write(fd, welcomefile_body, nbytes);
