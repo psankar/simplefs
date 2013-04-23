@@ -23,10 +23,10 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	struct simplefs_dir_record *record;
 	int i;
 
-	printk(KERN_INFO "We are inside readdir. The pos[%lld], inode number[%lu], superblock magic [%lu] inodesize [%lld]\n", pos, inode->i_ino, sb->s_magic, inode->i_size);
-
 	if (pos) {
-		printk(KERN_INFO "pos seem to be non-zero which means we have already filled in all the details\n");
+		/* FIXME: We use a hack of reading pos to figure if we have filled in all data.
+		 * We should probably fix this to work in a cursor based model and
+		 * use the tokens correctly to not fill too many data in each cursor based call */
 		return 0;
 	}
 
@@ -41,7 +41,6 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 	record = (struct simplefs_dir_record *) bh->b_data;
 	for (i=0; i < sfs_inode->dir_children_count; i++) {
-		printk(KERN_INFO "Got filename: %s\n", record->filename);
 		filldir(dirent, record->filename, SIMPLEFS_FILENAME_MAXLEN, pos, record->inode_no, DT_UNKNOWN);
 		filp->f_pos += sizeof(struct simplefs_dir_record);
 		pos += sizeof(struct simplefs_dir_record);
@@ -50,24 +49,6 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 	return 0;
 }
-
-const struct file_operations simplefs_dir_operations = {
-	.owner = THIS_MODULE,
-	.readdir = simplefs_readdir,
-};
-
-struct dentry *simplefs_lookup(struct inode *parent_inode,
-			       struct dentry *child_dentry, unsigned int flags)
-{
-	/* The lookup function is used for dentry association.
-	 * As of now, we don't deal with dentries in simplefs.
-	 * So we will keep this simple for now and revisit later */
-	return NULL;
-}
-
-static struct inode_operations simplefs_inode_ops = {
-	.lookup = simplefs_lookup,
-};
 
 /* This functions returns a simplefs_inode with the given inode_no
  * from the inode store, if it exists. */
@@ -91,6 +72,59 @@ struct simplefs_inode * simplefs_get_inode(struct super_block *sb, uint64_t inod
 			return sfs_inode;
 		}
 		sfs_inode++;
+	}
+
+	return NULL;
+}
+
+const struct file_operations simplefs_dir_operations = {
+	.owner = THIS_MODULE,
+	.readdir = simplefs_readdir,
+};
+
+struct dentry *simplefs_lookup(struct inode *parent_inode,
+			       struct dentry *child_dentry, unsigned int flags);
+
+static struct inode_operations simplefs_inode_ops = {
+	.lookup = simplefs_lookup,
+};
+
+struct dentry *simplefs_lookup(struct inode *parent_inode,
+			       struct dentry *child_dentry, unsigned int flags)
+{
+	struct simplefs_inode *parent = SIMPLEFS_INODE(parent_inode);
+	struct super_block *sb = parent_inode->i_sb;
+	struct buffer_head *bh;
+	struct simplefs_dir_record *record;
+	int i;
+
+	bh = (struct buffer_head *)sb_bread(sb, parent->data_block_number);
+	record = (struct simplefs_dir_record *) bh->b_data;
+	for (i=0; i < parent->dir_children_count; i++) {
+		if (!strcmp(record->filename, child_dentry->d_name.name)) {
+
+			struct inode *inode;
+			struct simplefs_inode *sfs_inode;
+
+			/* FIXME: This simplefs_inode is leaking */
+			sfs_inode = simplefs_get_inode(sb, record->inode_no);
+
+			/* FIXME: This inode is leaking */
+			inode = new_inode(sb);
+			inode->i_ino = record->inode_no;
+			inode_init_owner(inode, parent_inode, sfs_inode->mode);
+			inode->i_sb = sb;
+			inode->i_op = &simplefs_inode_ops;
+			inode->i_fop = &simplefs_dir_operations;
+
+			/* FIXME: We should store these times to disk and retrieve them */
+			inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+
+			inode->i_private = sfs_inode;
+
+			d_add(child_dentry, inode);
+			return NULL;
+		}
 	}
 
 	return NULL;
