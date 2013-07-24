@@ -81,6 +81,52 @@ struct simplefs_inode *simplefs_get_inode(struct super_block *sb,
 	return NULL;
 }
 
+ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
+		      loff_t * ppos)
+{
+	/* Hack to make sure that we answer the read call only once and not loop infinitely.
+	 * We need to implement support for filesize in inode to remove this hack */
+	static int done = 0;
+
+	/* After the commit dd37978c5 in the upstream linux kernel,
+	 * we can use just filp->f_inode instead of the
+	 * f->f_path.dentry->d_inode redirection */
+	struct simplefs_inode *inode =
+	    SIMPLEFS_INODE(filp->f_path.dentry->d_inode);
+	struct buffer_head *bh;
+
+	char *buffer;
+	int nbytes;
+
+	if (done) {
+		done = 0;
+		return 0;
+	}
+
+	bh = (struct buffer_head *)sb_bread(filp->f_path.dentry->d_inode->i_sb,
+					    inode->data_block_number);
+	buffer = (char *)bh->b_data;
+	nbytes = min(strlen(buffer), len);
+
+	if (copy_to_user(buf, buffer, nbytes)) {
+		brelse(bh);
+		printk(KERN_ERR
+		       "Error copying file contents to the userspace buffer\n");
+		return -EFAULT;
+	}
+
+	brelse(bh);
+
+	*ppos += nbytes;
+
+	done = 1;
+	return nbytes;
+}
+
+const struct file_operations simplefs_file_operations = {
+	.read = simplefs_read
+};
+
 const struct file_operations simplefs_dir_operations = {
 	.owner = THIS_MODULE,
 	.readdir = simplefs_readdir,
@@ -119,7 +165,14 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 			inode_init_owner(inode, parent_inode, sfs_inode->mode);
 			inode->i_sb = sb;
 			inode->i_op = &simplefs_inode_ops;
-			inode->i_fop = &simplefs_dir_operations;
+
+			if (S_ISDIR(inode->i_mode))
+				inode->i_fop = &simplefs_dir_operations;
+			else if (S_ISREG(inode->i_mode))
+				inode->i_fop = &simplefs_file_operations;
+			else
+				printk(KERN_ERR
+				       "Unknown inode type. Neither a directory nor a file");
 
 			/* FIXME: We should store these times to disk and retrieve them */
 			inode->i_atime = inode->i_mtime = inode->i_ctime =

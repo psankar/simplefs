@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
 	struct simplefs_inode welcomefile_inode;
 
 	char welcomefile_name[] = "vanakkam";
-	char welcomefile_body[] = "Love is God. God is Love. Anbe Murugan.";
+	char welcomefile_body[] = "Love is God. God is Love. Anbe Murugan.\n";
 	const uint64_t WELCOMEFILE_INODE_NUMBER = 2;
 	const uint64_t WELCOMEFILE_DATABLOCK_NUMBER = 3;
 
