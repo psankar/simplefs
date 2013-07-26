@@ -47,6 +47,7 @@ int main(int argc, char *argv[])
 
 	/* FIXME: Free blocks management is not implemented yet */
 	sb.free_blocks = ~0;
+	sb.free_blocks &= ~(1 << WELCOMEFILE_DATABLOCK_NUMBER);
 
 	ret = write(fd, (char *)&sb, sizeof(sb));
 
