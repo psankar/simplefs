@@ -141,13 +141,17 @@ static int simplefs_sb_get_objects_count(struct super_block *vsb,
 
 static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
-	loff_t pos = filp->f_pos;
-	struct inode *inode = filp->f_dentry->d_inode;
-	struct super_block *sb = inode->i_sb;
+	loff_t pos;
+	struct inode *inode;
+	struct super_block *sb;
 	struct buffer_head *bh;
 	struct simplefs_inode *sfs_inode;
 	struct simplefs_dir_record *record;
 	int i;
+
+	pos = filp->f_pos;
+	inode = filp->f_dentry->d_inode;
+	sb = inode->i_sb;
 
 	if (pos) {
 		/* FIXME: We use a hack of reading pos to figure if we have filled in all data.
@@ -159,8 +163,10 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	sfs_inode = SIMPLEFS_INODE(inode);
 
 	if (unlikely(!S_ISDIR(sfs_inode->mode))) {
-		printk(KERN_ERR "inode %llu not a directory",
-		       sfs_inode->inode_no);
+		printk(KERN_ERR
+		       "inode [%llu][%lu] for fs object [%s] not a directory\n",
+		       sfs_inode->inode_no, inode->i_ino,
+		       filp->f_dentry->d_name.name);
 		return -ENOTDIR;
 	}
 
@@ -238,8 +244,7 @@ ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
 	}
 
 	if (*ppos >= inode->file_size) {
-		printk(KERN_INFO
-		       "Read request with offset beyond the filesize\n");
+		/* Read request with offset beyond the filesize */
 		return 0;
 	}
 
@@ -285,13 +290,17 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 static int simplefs_create(struct inode *dir, struct dentry *dentry,
 			   umode_t mode, bool excl);
 
+static int simplefs_mkdir(struct inode *dir, struct dentry *dentry,
+			  umode_t mode);
+
 static struct inode_operations simplefs_inode_ops = {
 	.create = simplefs_create,
 	.lookup = simplefs_lookup,
+	.mkdir = simplefs_mkdir,
 };
 
-static int simplefs_create(struct inode *dir, struct dentry *dentry,
-			   umode_t mode, bool excl)
+static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
+				     umode_t mode)
 {
 	struct inode *inode;
 	struct simplefs_inode *sfs_inode;
@@ -303,6 +312,8 @@ static int simplefs_create(struct inode *dir, struct dentry *dentry,
 	uint64_t count;
 	int ret;
 
+	printk(KERN_INFO "simplefs create fs object is called\n");
+
 	if (mutex_lock_interruptible(&simplefs_directory_children_update_lock)) {
 		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
 		       __FILE__, __LINE__);
@@ -312,6 +323,7 @@ static int simplefs_create(struct inode *dir, struct dentry *dentry,
 
 	ret = simplefs_sb_get_objects_count(sb, &count);
 	if (ret < 0) {
+		mutex_unlock(&simplefs_directory_children_update_lock);
 		return ret;
 	}
 
@@ -319,18 +331,22 @@ static int simplefs_create(struct inode *dir, struct dentry *dentry,
 		/* The above condition can be just == insted of the >= */
 		printk(KERN_ERR
 		       "Maximum number of objects supported by simplefs is already reached");
+		mutex_unlock(&simplefs_directory_children_update_lock);
 		return -ENOSPC;
 	}
 
 	if (!S_ISDIR(mode) && !S_ISREG(mode)) {
 		printk(KERN_ERR
 		       "Creation request but for neither a file nor a directory");
+		mutex_unlock(&simplefs_directory_children_update_lock);
 		return -EINVAL;
 	}
 
 	inode = new_inode(sb);
-	if (!inode)
+	if (!inode) {
+		mutex_unlock(&simplefs_directory_children_update_lock);
 		return -ENOMEM;
+	}
 
 	inode->i_sb = sb;
 	inode->i_op = &simplefs_inode_ops;
@@ -339,7 +355,7 @@ static int simplefs_create(struct inode *dir, struct dentry *dentry,
 
 	/* Loop until we get an unique inode number */
 	while (simplefs_get_inode(sb, inode->i_ino)) {
-		printk(KERN_INFO "inode [%lu] already exists\n", inode->i_ino);
+		/* inode inode->i_ino already exists */
 		inode->i_ino++;
 	}
 	printk(KERN_INFO "Got new unique inode number [%lu]\n", inode->i_ino);
@@ -347,17 +363,16 @@ static int simplefs_create(struct inode *dir, struct dentry *dentry,
 	/* FIXME: This is leaking. We need to free all in-memory inodes sometime */
 	sfs_inode = kmalloc(sizeof(struct simplefs_inode), GFP_KERNEL);
 	sfs_inode->inode_no = inode->i_ino;
-	inode->i_private = &sfs_inode;
+	inode->i_private = sfs_inode;
+	sfs_inode->mode = mode;
 
 	if (S_ISDIR(mode)) {
 		printk(KERN_INFO "New directory creation request\n");
 		sfs_inode->dir_children_count = 0;
-		sfs_inode->mode = S_IFDIR;
 		inode->i_fop = &simplefs_dir_operations;
 	} else if (S_ISREG(mode)) {
 		printk(KERN_INFO "New file creation request\n");
 		sfs_inode->file_size = 0;
-		sfs_inode->mode = S_IFREG;
 		inode->i_fop = &simplefs_file_operations;
 	}
 
@@ -371,6 +386,7 @@ static int simplefs_create(struct inode *dir, struct dentry *dentry,
 	ret = simplefs_sb_get_a_freeblock(sb, &sfs_inode->data_block_number);
 	if (ret < 0) {
 		printk(KERN_ERR "simplefs could not get a freeblock");
+		mutex_unlock(&simplefs_directory_children_update_lock);
 		return ret;
 	}
 
@@ -396,6 +412,7 @@ static int simplefs_create(struct inode *dir, struct dentry *dentry,
 	parent_dir_inode->dir_children_count++;
 
 	if (mutex_lock_interruptible(&simplefs_inodes_mgmt_lock)) {
+		mutex_unlock(&simplefs_directory_children_update_lock);
 		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
 		       __FILE__, __LINE__);
 		return -EINTR;
@@ -411,14 +428,27 @@ static int simplefs_create(struct inode *dir, struct dentry *dentry,
 
 	mutex_unlock(&simplefs_directory_children_update_lock);
 
-	printk(KERN_INFO "Returning success after creating the file\n");
+	printk(KERN_INFO
+	       "Returning success after creating the file/directory\n");
 
 	inode_init_owner(inode, dir, mode);
 	d_add(dentry, inode);
 
-	/* This sleep is necessary to update the dentry cache */
-	msleep(5);
 	return 0;
+}
+
+static int simplefs_mkdir(struct inode *dir, struct dentry *dentry,
+			  umode_t mode)
+{
+	/* I believe this is a bug in the kernel, for some reason, the mkdir callback
+	 * does not get the S_IFDIR flag set. Even ext2 sets is explicitly */
+	return simplefs_create_fs_object(dir, dentry, S_IFDIR | mode);
+}
+
+static int simplefs_create(struct inode *dir, struct dentry *dentry,
+			   umode_t mode, bool excl)
+{
+	return simplefs_create_fs_object(dir, dentry, mode);
 }
 
 struct dentry *simplefs_lookup(struct inode *parent_inode,
@@ -474,7 +504,7 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 	}
 
 	printk(KERN_ERR
-	       "No inode found for the filename [%s] under the directory\n",
+	       "No inode found for the filename [%s]\n",
 	       child_dentry->d_name.name);
 
 	return NULL;
