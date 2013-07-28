@@ -38,6 +38,7 @@ void simplefs_sb_sync(struct super_block *vsb)
 	bh->b_data = (char *)sb;
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
+	brelse(bh);
 }
 
 void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
@@ -71,6 +72,7 @@ void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 
 	mark_buffer_dirty(bh);
 	simplefs_sb_sync(vsb);
+	brelse(bh);
 
 	mutex_unlock(&simplefs_sb_lock);
 	mutex_unlock(&simplefs_inodes_mgmt_lock);
@@ -180,6 +182,7 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		pos += sizeof(struct simplefs_dir_record);
 		record++;
 	}
+	brelse(bh);
 
 	return 0;
 }
@@ -243,6 +246,8 @@ ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
 		return 0;
 	}
 
+	printk(KERN_INFO "Read request for file of size: [%llu]\n",
+	       inode->file_size);
 	if (*ppos >= inode->file_size) {
 		/* Read request with offset beyond the filesize */
 		return 0;
@@ -258,7 +263,7 @@ ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
 	}
 
 	buffer = (char *)bh->b_data;
-	nbytes = min(strlen(buffer), len);
+	nbytes = min((size_t) inode->file_size, len);
 
 	if (copy_to_user(buf, buffer, nbytes)) {
 		brelse(bh);
@@ -275,8 +280,117 @@ ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
 	return nbytes;
 }
 
+/* FIXME: The write support is rudimentary. I have not figured out a way to do writes
+ * from particular offsets (even though I have written some untested code for this below) efficiently. */
+ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
+		       loff_t * ppos)
+{
+	/* After the commit dd37978c5 in the upstream linux kernel,
+	 * we can use just filp->f_inode instead of the
+	 * f->f_path.dentry->d_inode redirection */
+	struct inode *inode;
+	struct simplefs_inode *sfs_inode;
+	struct simplefs_inode *inode_iterator;
+	struct buffer_head *bh;
+	struct super_block *sb;
+
+	char *buffer;
+	int count;
+
+	printk(KERN_INFO "file size write begins\n");
+
+	inode = filp->f_path.dentry->d_inode;
+	sfs_inode = SIMPLEFS_INODE(inode);
+	sb = inode->i_sb;
+
+	if (*ppos + len >= SIMPLEFS_DEFAULT_BLOCK_SIZE) {
+		printk(KERN_ERR "File size write will exceed a block");
+		return -ENOSPC;
+	}
+
+	bh = (struct buffer_head *)sb_bread(filp->f_path.dentry->d_inode->i_sb,
+					    sfs_inode->data_block_number);
+
+	if (!bh) {
+		printk(KERN_ERR "Reading the block number [%llu] failed.",
+		       sfs_inode->data_block_number);
+		return 0;
+	}
+	buffer = (char *)bh->b_data;
+
+	/* Move the pointer until the required byte offset */
+	buffer += *ppos;
+
+	if (copy_from_user(buffer, buf, len)) {
+		brelse(bh);
+		printk(KERN_ERR
+		       "Error copying file contents from the userspace buffer to the kernel space\n");
+		return -EFAULT;
+	}
+	*ppos += len;
+
+	mark_buffer_dirty(bh);
+	sync_dirty_buffer(bh);
+	brelse(bh);
+
+	/* Set new size
+	 * sfs_inode->file_size = max(sfs_inode->file_size, *ppos);
+	 *
+	 * FIXME: What to do if someone writes only some parts in between ?
+	 * The above code will also fail in case a file is overwritten with
+	 * a shorter buffer */
+
+	if (mutex_lock_interruptible(&simplefs_inodes_mgmt_lock)) {
+		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
+		       __FILE__, __LINE__);
+		return -EINTR;
+	}
+	/* Save the modified inode */
+	bh = (struct buffer_head *)sb_bread(sb,
+					    SIMPLEFS_INODESTORE_BLOCK_NUMBER);
+
+	sfs_inode->file_size = *ppos;
+
+	inode_iterator = (struct simplefs_inode *)bh->b_data;
+
+	if (mutex_lock_interruptible(&simplefs_sb_lock)) {
+		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
+		       __FILE__, __LINE__);
+		return -EINTR;
+	}
+
+	count = 0;
+	while (inode_iterator->inode_no != sfs_inode->inode_no
+	       && count < SIMPLEFS_SB(sb)->inodes_count) {
+		count++;
+		inode_iterator++;
+	}
+
+	if (likely(count < SIMPLEFS_SB(sb)->inodes_count)) {
+		inode_iterator->file_size = sfs_inode->file_size;
+		printk(KERN_INFO
+		       "The new filesize that is written is: [%llu] and len was: [%lu]\n",
+		       sfs_inode->file_size, len);
+
+		mark_buffer_dirty(bh);
+		sync_dirty_buffer(bh);
+	} else {
+		printk(KERN_ERR
+		       "The new filesize could not be stored to the inode.");
+		len = -EIO;
+	}
+
+	brelse(bh);
+
+	mutex_unlock(&simplefs_sb_lock);
+	mutex_unlock(&simplefs_inodes_mgmt_lock);
+
+	return len;
+}
+
 const struct file_operations simplefs_file_operations = {
-	.read = simplefs_read
+	.read = simplefs_read,
+	.write = simplefs_write,
 };
 
 const struct file_operations simplefs_dir_operations = {
@@ -408,6 +522,7 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
+	brelse(bh);
 
 	parent_dir_inode->dir_children_count++;
 
@@ -423,6 +538,7 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
+	brelse(bh);
 
 	mutex_unlock(&simplefs_inodes_mgmt_lock);
 
