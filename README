@@ -34,7 +34,9 @@ A big thanks should go to the kernelnewbies mailing list for helping me with cla
 
 TODO
 -----
-- Check the locks. Remove/Add as necessary.
+- Check the locks. Remove/Add locks as necessary
+- Fix the bug related to creation of files in subdirs
+- Fix various README / TODO comments in the code
 - Send for review
 - Make a 1.0 release
 - After the 1.0 release, start with support for extents, which on completion will be 2.0
@@ -72,72 +74,31 @@ welcomefilebody has been written succesfully
 psankar@linux-9dni:~/src/simplefs>
 
 Now as root:
-linux-9dni:/home/psankar/src/simplefs # insmod simplefs.ko ; mount -o loop -t simplefs image /home/psankar/src/simplefs/mount/ ; dmesg
-[ 7064.752268] Sucessfully registered simplefs
-[ 7064.756404] The magic number obtained in disk is: [268640275]
-[ 7064.756410] simplefs filesystem of version [1] formatted with a block size of [4096] detected in the device.
-[ 7064.756457] simplefs is succesfully mounted on [/dev/loop10]
-linux-9dni:/home/psankar/src/simplefs # cd mount/
-linux-9dni:/home/psankar/src/simplefs/mount # cat vanakkam
-Love is God. God is Love. Anbe Murugan.
-linux-9dni:/home/psankar/src/simplefs/mount # cp vanakkam hello
-linux-9dni:/home/psankar/src/simplefs/mount # cat hello
-Love is God. God is Love. Anbe Murugan.
-linux-9dni:/home/psankar/src/simplefs/mount # echo "Let there be files :-)" > hello
-linux-9dni:/home/psankar/src/simplefs/mount # cat hello
-Let there be files :-)
-linux-9dni:/home/psankar/src/simplefs/mount # touch world
-linux-9dni:/home/psankar/src/simplefs/mount # cat world
-linux-9dni:/home/psankar/src/simplefs/mount # echo "Hello World" > world
-linux-9dni:/home/psankar/src/simplefs/mount # cat world
-Hello World
-linux-9dni:/home/psankar/src/simplefs/mount # ..
-linux-9dni:/home/psankar/src/simplefs # umount mount ; rmmod simplefs.ko
 linux-9dni:/home/psankar/src/simplefs # insmod simplefs.ko ; mount -o loop -t simplefs image /home/psankar/src/simplefs/mount/
 linux-9dni:/home/psankar/src/simplefs # cd mount/
-linux-9dni:/home/psankar/src/simplefs/mount # cat world
+linux-9dni:/home/psankar/src/simplefs/mount # ls
+vanakkam
+linux-9dni:/home/psankar/src/simplefs/mount # cat vanakkam
+Love is God. God is Love. Anbe Murugan.
+linux-9dni:/home/psankar/src/simplefs/mount # cp vanakkam Hello
+linux-9dni:/home/psankar/src/simplefs/mount # cat Hello
+Love is God. God is Love. Anbe Murugan.
+linux-9dni:/home/psankar/src/simplefs/mount # echo "Hello World" > Hello
+linux-9dni:/home/psankar/src/simplefs/mount # cat Hello
 Hello World
-linux-9dni:/home/psankar/src/simplefs/mount # cat hello
-Let there be files :-)
-linux-9dni:/home/psankar/src/simplefs/mount # ..
-linux-9dni:/home/psankar/src/simplefs # umount mount ; rmmod simplefs.ko ; dmesg -c
-[ 7064.752268] Sucessfully registered simplefs
-[ 7064.756404] The magic number obtained in disk is: [268640275]
-[ 7064.756410] simplefs filesystem of version [1] formatted with a block size of [4096] detected in the device.
-[ 7064.756457] simplefs is succesfully mounted on [/dev/loop10]
-[ 7070.816973] Read request for file of size: [41]
-[ 7081.274818] No inode found for the filename [hello]
-[ 7081.274835] No inode found for the filename [hello]
-[ 7081.274853] No inode found for the filename [hello]
-[ 7081.274874] simplefs create fs object is called
-[ 7081.274888] Got new unique inode number [10]
-[ 7081.274890] New file creation request
-[ 7081.275037] Returning success after creating the file/directory
-[ 7081.275050] Read request for file of size: [41]
-[ 7081.275054] file size write begins
-[ 7081.275067] The new filesize that is written is: [41] and len was: [41]
-[ 7083.645271] Read request for file of size: [41]
-[ 7118.672573] file size write begins
-[ 7118.672655] The new filesize that is written is: [23] and len was: [23]
-[ 7120.387921] Read request for file of size: [23]
-[ 7129.434414] No inode found for the filename [world]
-[ 7129.434424] simplefs create fs object is called
-[ 7129.434429] Got new unique inode number [11]
-[ 7129.434430] New file creation request
-[ 7129.434568] Returning success after creating the file/directory
-[ 7131.279727] Read request for file of size: [0]
-[ 7140.382962] file size write begins
-[ 7140.383083] The new filesize that is written is: [12] and len was: [12]
-[ 7142.150113] Read request for file of size: [12]
-[ 7153.773088] simplefs superblock is destroyed. Unmount succesful.
-[ 7153.778315] Sucessfully unregistered simplefs
-[ 7163.614771] Sucessfully registered simplefs
-[ 7163.618539] The magic number obtained in disk is: [268640275]
-[ 7163.618546] simplefs filesystem of version [1] formatted with a block size of [4096] detected in the device.
-[ 7163.618587] simplefs is succesfully mounted on [/dev/loop11]
-[ 7173.341241] Read request for file of size: [12]
-[ 7181.062284] Read request for file of size: [23]
-[ 7195.867825] simplefs superblock is destroyed. Unmount succesful.
-[ 7195.872485] Sucessfully unregistered simplefs
-linux-9dni:/home/psankar/src/simplefs # 
-
+linux-9dni:/home/psankar/src/simplefs/mount # mkdir dir
+linux-9dni:/home/psankar/src/simplefs/mount # cd dir
+linux-9dni:/home/psankar/src/simplefs/mount/dir # cp ../Hello .
+linux-9dni:/home/psankar/src/simplefs/mount/dir # cat Hello
+Hello World
+linux-9dni:/home/psankar/src/simplefs/mount/dir # echo "Vanakkam Ulagam" > Hello 
+linux-9dni:/home/psankar/src/simplefs/mount/dir # cat Hello
+Vanakkam Ulagam
+linux-9dni:/home/psankar/src/simplefs/mount/dir # ...
+linux-9dni:/home/psankar/src/simplefs # umount mount ; rmmod simplefs.ko
+linux-9dni:/home/psankar/src/simplefs # #Now let us remount and see if all the changes were written to the disk
+linux-9dni:/home/psankar/src/simplefs # insmod simplefs.ko ; mount -o loop -t simplefs image /home/psankar/src/simplefs/mount/
+linux-9dni:/home/psankar/src/simplefs # cd mount/
+linux-9dni:/home/psankar/src/simplefs/mount # cat Hello
+Hello World
+linux-9dni:/home/psankar/src/simplefs/mount #
