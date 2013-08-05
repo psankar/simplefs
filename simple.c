@@ -246,8 +246,6 @@ ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
 		return 0;
 	}
 
-	printk(KERN_INFO "Read request for file of size: [%llu]\n",
-	       inode->file_size);
 	if (*ppos >= inode->file_size) {
 		/* Read request with offset beyond the filesize */
 		return 0;
@@ -296,8 +294,6 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 
 	char *buffer;
 	int count;
-
-	printk(KERN_INFO "file size write begins\n");
 
 	inode = filp->f_path.dentry->d_inode;
 	sfs_inode = SIMPLEFS_INODE(inode);
@@ -418,6 +414,7 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 {
 	struct inode *inode;
 	struct simplefs_inode *sfs_inode;
+	struct simplefs_inode *inode_iterator;
 	struct super_block *sb;
 	struct simplefs_dir_record *record;
 	struct simplefs_inode *parent_dir_inode;
@@ -425,8 +422,6 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 	struct simplefs_dir_record *dir_contents_datablock;
 	uint64_t count;
 	int ret;
-
-	printk(KERN_INFO "simplefs create fs object is called\n");
 
 	if (mutex_lock_interruptible(&simplefs_directory_children_update_lock)) {
 		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
@@ -472,7 +467,6 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 		/* inode inode->i_ino already exists */
 		inode->i_ino++;
 	}
-	printk(KERN_INFO "Got new unique inode number [%lu]\n", inode->i_ino);
 
 	/* FIXME: This is leaking. We need to free all in-memory inodes sometime */
 	sfs_inode = kmalloc(sizeof(struct simplefs_inode), GFP_KERNEL);
@@ -524,8 +518,6 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 	sync_dirty_buffer(bh);
 	brelse(bh);
 
-	parent_dir_inode->dir_children_count++;
-
 	if (mutex_lock_interruptible(&simplefs_inodes_mgmt_lock)) {
 		mutex_unlock(&simplefs_directory_children_update_lock);
 		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
@@ -536,16 +528,42 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 	bh = (struct buffer_head *)sb_bread(sb,
 					    SIMPLEFS_INODESTORE_BLOCK_NUMBER);
 
-	mark_buffer_dirty(bh);
-	sync_dirty_buffer(bh);
+	inode_iterator = (struct simplefs_inode *)bh->b_data;
+
+	if (mutex_lock_interruptible(&simplefs_sb_lock)) {
+		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
+		       __FILE__, __LINE__);
+		return -EINTR;
+	}
+
+	count = 0;
+	while (inode_iterator->inode_no != parent_dir_inode->inode_no
+	       && count < SIMPLEFS_SB(sb)->inodes_count) {
+		count++;
+		inode_iterator++;
+	}
+
+	if (likely(inode_iterator->inode_no == parent_dir_inode->inode_no)) {
+		parent_dir_inode->dir_children_count++;
+		inode_iterator->dir_children_count =
+		    parent_dir_inode->dir_children_count;
+		/* Updated the parent inode's dir count to reflect the new child too */
+
+		mark_buffer_dirty(bh);
+		sync_dirty_buffer(bh);
+	} else {
+		printk(KERN_ERR
+		       "The updated childcount could not be stored to the dir inode.");
+		/* TODO: Remove the newly created inode from the disk and in-memory inode store
+		 * and also update the superblock, freemaps etc. to reflect the same.
+		 * Basically, Undo all actions done during this create call */
+	}
+
 	brelse(bh);
 
+	mutex_unlock(&simplefs_sb_lock);
 	mutex_unlock(&simplefs_inodes_mgmt_lock);
-
 	mutex_unlock(&simplefs_directory_children_update_lock);
-
-	printk(KERN_INFO
-	       "Returning success after creating the file/directory\n");
 
 	inode_init_owner(inode, dir, mode);
 	d_add(dentry, inode);
