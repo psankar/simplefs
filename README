@@ -2,22 +2,24 @@ A simple filesystem to understand things.
 
 This is a Work In Progress. Do not use this yet.
 
+If you are planning to learn filesystems, start from the scratch. You can look from the first commit in this repository and move the way up.
+
 The source files are licensed under Creative Commons Zero License.
 More information at:	http://creativecommons.org/publicdomain/zero/1.0/
 Full license text at:	http://creativecommons.org/publicdomain/zero/1.0/legalcode
 
-Architecture + Notes
---------------------
+simplefs 1.0 Architecture + Notes
+---------------------------------
 
 Block Zero = Super block
 Block One = Inode store
 Block Two = Occupied by the initial file that is created as part of the mkfs.
 
 Only a limited number of filesystem objects are supported.
+Files and Directories can be created. Support for .create and .mkdir is implemented. Nested directories can be created.
 A file cannot grow beyond one block. ENOSPC will be returned as an error on attempting to do.
 Directories store the children inode number and name in their data blocks.
 Read support is implemented.
-Files and Directories can be created. Support for .create and .mkdir is implemented.
 Basic write support is implemented. Writes may not succeed if done in an offset. Works when you overwrite the entire block.
 Locks are not well thought-out. The current locking scheme works but needs more analysis + code reviews.
 Memory leaks may (will ?) exist.
@@ -36,14 +38,8 @@ Special thanks to Ankit Jain who provides interesting conversations to help my i
 
 TODO
 -----
-- Make a 1.0 release
 - After the 1.0 release, start with support for extents, which on completion will be 2.0
 - After the 2.0 release, start with journalling support, which on completion will be 3.0
-
-
-How To ?
---------
-If you are planning to learn filesystems, start from the scratch. You can look from the first commit in this repository and move the way up.
 
 
 To compile:
