@@ -11,6 +11,7 @@
 #include <linux/buffer_head.h>
 #include <linux/slab.h>
 #include <linux/random.h>
+#include <linux/version.h>
 
 #include "super.h"
 
@@ -141,7 +142,11 @@ static int simplefs_sb_get_objects_count(struct super_block *vsb,
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
+static int simplefs_iterate(struct file *filp, struct dir_context *ctx)
+#else
 static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
+#endif
 {
 	loff_t pos;
 	struct inode *inode;
@@ -151,7 +156,11 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	struct simplefs_dir_record *record;
 	int i;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
+	pos = ctx->pos;
+#else
 	pos = filp->f_pos;
+#endif
 	inode = filp->f_dentry->d_inode;
 	sb = inode->i_sb;
 
@@ -176,8 +185,14 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 	record = (struct simplefs_dir_record *)bh->b_data;
 	for (i = 0; i < sfs_inode->dir_children_count; i++) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
+		dir_emit(ctx, record->filename, SIMPLEFS_FILENAME_MAXLEN,
+			record->inode_no, DT_UNKNOWN);
+		ctx->pos += sizeof(struct simplefs_dir_record);
+#else
 		filldir(dirent, record->filename, SIMPLEFS_FILENAME_MAXLEN, pos,
 			record->inode_no, DT_UNKNOWN);
+#endif
 		filp->f_pos += sizeof(struct simplefs_dir_record);
 		pos += sizeof(struct simplefs_dir_record);
 		record++;
@@ -391,7 +406,11 @@ const struct file_operations simplefs_file_operations = {
 
 const struct file_operations simplefs_dir_operations = {
 	.owner = THIS_MODULE,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
+	.iterate = simplefs_iterate,
+#else
 	.readdir = simplefs_readdir,
+#endif
 };
 
 struct dentry *simplefs_lookup(struct inode *parent_inode,
