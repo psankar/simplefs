@@ -27,7 +27,7 @@ Memory leaks may (will ?) exist.
 
 Credits
 --------
-All the source code is written by me (Sankar P) until this point.
+The initial source code is written by psankar and patches are contributed by other github members. azat being the first contributor.
 
 An O_LARGETHANKS to the guidance of VijaiBabu M and Santosh Venugopal. Their excellent talks on filesystems motivated me to implement a file system from the scratch. Without their inspirational speeches, I would not have focussed on filesystems.
 
@@ -35,6 +35,14 @@ A big thanks should go to the kernelnewbies mailing list for helping me with cla
 
 Special thanks to Ankit Jain who provides interesting conversations to help my intellectual curiosities.
 
+
+Patch Submission
+-----------------
+Please send a merge request only if you are ready to publish your changes in the same creative commons zero license.
+
+We would like to keep the filesystem simple and minimal so that it can be used as a good teaching material.
+
+We are not planning to use this filesystem in a production machine. So some design choices are driven by learning/teaching simplicity over performance/scalability. This is intentional. So do not try to fix those things :)
 
 TODO
 -----
