@@ -192,8 +192,8 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 #else
 		filldir(dirent, record->filename, SIMPLEFS_FILENAME_MAXLEN, pos,
 			record->inode_no, DT_UNKNOWN);
-#endif
 		filp->f_pos += sizeof(struct simplefs_dir_record);
+#endif
 		pos += sizeof(struct simplefs_dir_record);
 		record++;
 	}
