@@ -763,6 +763,7 @@ struct file_system_type simplefs_fs_type = {
 	.name = "simplefs",
 	.mount = simplefs_mount,
 	.kill_sb = simplefs_kill_superblock,
+	.fs_flags = FS_REQUIRES_DEV,
 };
 
 static int simplefs_init(void)
