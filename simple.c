@@ -672,6 +672,7 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 	struct inode *root_inode;
 	struct buffer_head *bh;
 	struct simplefs_super_block *sb_disk;
+	int ret = -EPERM;
 
 	bh = (struct buffer_head *)sb_bread(sb,
 					    SIMPLEFS_SUPERBLOCK_BLOCK_NUMBER);
@@ -685,13 +686,13 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 	if (unlikely(sb_disk->magic != SIMPLEFS_MAGIC)) {
 		printk(KERN_ERR
 		       "The filesystem that you try to mount is not of type simplefs. Magicnumber mismatch.");
-		return -EPERM;
+		goto release;
 	}
 
 	if (unlikely(sb_disk->block_size != SIMPLEFS_DEFAULT_BLOCK_SIZE)) {
 		printk(KERN_ERR
 		       "simplefs seem to be formatted using a non-standard block size.");
-		return -EPERM;
+		goto release;
 	}
 
 	printk(KERN_INFO
@@ -724,10 +725,16 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 		iput(root_inode);
 #endif
 
-	if (!sb->s_root)
-		return -ENOMEM;
+	if (!sb->s_root) {
+		ret = -ENOMEM;
+		goto release;
+	}
 
-	return 0;
+	ret = 0;
+release:
+	brelse(bh);
+
+	return ret;
 }
 
 static struct dentry *simplefs_mount(struct file_system_type *fs_type,
