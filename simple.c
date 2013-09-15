@@ -83,7 +83,7 @@ void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
  * The block will be removed from the freeblock list.
  *
  * In an ideal, production-ready filesystem, we will not be dealing with blocks,
- * and instead we will be using extents 
+ * and instead we will be using extents
  *
  * If for some reason, the file creation/deletion failed, the block number
  * will still be marked as non-free. You need fsck to fix this.*/
