@@ -34,8 +34,7 @@ void simplefs_sb_sync(struct super_block *vsb)
 	struct buffer_head *bh;
 	struct simplefs_super_block *sb = SIMPLEFS_SB(vsb);
 
-	bh = (struct buffer_head *)sb_bread(vsb,
-					    SIMPLEFS_SUPERBLOCK_BLOCK_NUMBER);
+	bh = sb_bread(vsb, SIMPLEFS_SUPERBLOCK_BLOCK_NUMBER);
 	bh->b_data = (char *)sb;
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
@@ -54,8 +53,7 @@ void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 		return;
 	}
 
-	bh = (struct buffer_head *)sb_bread(vsb,
-					    SIMPLEFS_INODESTORE_BLOCK_NUMBER);
+	bh = sb_bread(vsb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
 
 	inode_iterator = (struct simplefs_inode *)bh->b_data;
 
@@ -181,7 +179,7 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		return -ENOTDIR;
 	}
 
-	bh = (struct buffer_head *)sb_bread(sb, sfs_inode->data_block_number);
+	bh = sb_bread(sb, sfs_inode->data_block_number);
 
 	record = (struct simplefs_dir_record *)bh->b_data;
 	for (i = 0; i < sfs_inode->dir_children_count; i++) {
@@ -216,8 +214,7 @@ struct simplefs_inode *simplefs_get_inode(struct super_block *sb,
 	/* The inode store can be read once and kept in memory permanently while mounting.
 	 * But such a model will not be scalable in a filesystem with
 	 * millions or billions of files (inodes) */
-	bh = (struct buffer_head *)sb_bread(sb,
-					    SIMPLEFS_INODESTORE_BLOCK_NUMBER);
+	bh = sb_bread(sb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
 	sfs_inode = (struct simplefs_inode *)bh->b_data;
 
 #if 0
@@ -266,7 +263,7 @@ ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
 		return 0;
 	}
 
-	bh = (struct buffer_head *)sb_bread(filp->f_path.dentry->d_inode->i_sb,
+	bh = sb_bread(filp->f_path.dentry->d_inode->i_sb,
 					    inode->data_block_number);
 
 	if (!bh) {
@@ -319,7 +316,7 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 		return -ENOSPC;
 	}
 
-	bh = (struct buffer_head *)sb_bread(filp->f_path.dentry->d_inode->i_sb,
+	bh = sb_bread(filp->f_path.dentry->d_inode->i_sb,
 					    sfs_inode->data_block_number);
 
 	if (!bh) {
@@ -357,8 +354,7 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 		return -EINTR;
 	}
 	/* Save the modified inode */
-	bh = (struct buffer_head *)sb_bread(sb,
-					    SIMPLEFS_INODESTORE_BLOCK_NUMBER);
+	bh = sb_bread(sb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
 
 	sfs_inode->file_size = *ppos;
 
@@ -546,8 +542,7 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 		return -EINTR;
 	}
 
-	bh = (struct buffer_head *)sb_bread(sb,
-					    SIMPLEFS_INODESTORE_BLOCK_NUMBER);
+	bh = sb_bread(sb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
 
 	inode_iterator = (struct simplefs_inode *)bh->b_data;
 
@@ -615,7 +610,7 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 	struct simplefs_dir_record *record;
 	int i;
 
-	bh = (struct buffer_head *)sb_bread(sb, parent->data_block_number);
+	bh = sb_bread(sb, parent->data_block_number);
 	record = (struct simplefs_dir_record *)bh->b_data;
 	for (i = 0; i < parent->dir_children_count; i++) {
 		if (!strcmp(record->filename, child_dentry->d_name.name)) {
@@ -674,8 +669,7 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 	struct simplefs_super_block *sb_disk;
 	int ret = -EPERM;
 
-	bh = (struct buffer_head *)sb_bread(sb,
-					    SIMPLEFS_SUPERBLOCK_BLOCK_NUMBER);
+	bh = sb_bread(sb, SIMPLEFS_SUPERBLOCK_BLOCK_NUMBER);
 
 	sb_disk = (struct simplefs_super_block *)bh->b_data;
 	/* FIXME: bh->b_data is probably leaking */
