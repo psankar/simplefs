@@ -672,7 +672,6 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 	bh = sb_bread(sb, SIMPLEFS_SUPERBLOCK_BLOCK_NUMBER);
 
 	sb_disk = (struct simplefs_super_block *)bh->b_data;
-	/* FIXME: bh->b_data is probably leaking */
 
 	printk(KERN_INFO "The magic number obtained in disk is: [%llu]\n",
 	       sb_disk->magic);
