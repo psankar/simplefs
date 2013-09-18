@@ -36,11 +36,11 @@ struct simplefs_inode {
 const int SIMPLEFS_MAX_FILESYSTEM_OBJECTS_SUPPORTED = 64;
 /* min (
 		SIMPLEFS_DEFAULT_BLOCK_SIZE / sizeof(struct simplefs_inode),
-		sizeof(uint64_t) //The free_blocks tracker in the sb 
+		sizeof(uint64_t) //The free_blocks tracker in the sb
  	); */
 
 /* FIXME: Move the struct to its own file and not expose the members
- * Always access using the simplefs_sb_* functions and 
+ * Always access using the simplefs_sb_* functions and
  * do not access the members directly */
 struct simplefs_super_block {
 	uint64_t version;
