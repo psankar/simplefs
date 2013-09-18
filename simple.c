@@ -431,7 +431,6 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 	struct simplefs_inode *sfs_inode;
 	struct simplefs_inode *inode_iterator;
 	struct super_block *sb;
-	struct simplefs_dir_record *record;
 	struct simplefs_inode *parent_dir_inode;
 	struct buffer_head *bh;
 	struct simplefs_dir_record *dir_contents_datablock;
@@ -515,10 +514,6 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 
 	simplefs_inode_add(sb, sfs_inode);
 
-	record = kmalloc(sizeof(struct simplefs_dir_record), GFP_KERNEL);
-	record->inode_no = sfs_inode->inode_no;
-	strcpy(record->filename, dentry->d_name.name);
-
 	parent_dir_inode = SIMPLEFS_INODE(dir);
 	bh = sb_bread(sb, parent_dir_inode->data_block_number);
 	dir_contents_datablock = (struct simplefs_dir_record *)bh->b_data;
@@ -526,10 +521,8 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 	/* Navigate to the last record in the directory contents */
 	dir_contents_datablock += parent_dir_inode->dir_children_count;
 
-	memcpy(dir_contents_datablock, record,
-	       sizeof(struct simplefs_dir_record));
-
-	kfree(record);
+	dir_contents_datablock->inode_no = sfs_inode->inode_no;
+	strcpy(dir_contents_datablock->filename, dentry->d_name.name);
 
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
