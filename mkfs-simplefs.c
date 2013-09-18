@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 	const uint64_t WELCOMEFILE_INODE_NUMBER = 2;
 	const uint64_t WELCOMEFILE_DATABLOCK_NUMBER = 3;
 
-	char *block_padding;
+	char *block_padding = NULL;
 
 	struct simplefs_dir_record record;
 
@@ -154,6 +154,9 @@ int main(int argc, char *argv[])
 	ret = 0;
 
 exit:
+	if (block_padding) {
+		free(block_padding);
+	}
 	close(fd);
 	return ret;
 }
