@@ -1,6 +1,7 @@
 #define SIMPLEFS_MAGIC 0x10032013
 #define SIMPLEFS_DEFAULT_BLOCK_SIZE 4096
 #define SIMPLEFS_FILENAME_MAXLEN 255
+#define SIMPLEFS_START_INO 10
 
 /* Hard-coded inode number for the root directory */
 const int SIMPLEFS_ROOTDIR_INODE_NUMBER = 1;

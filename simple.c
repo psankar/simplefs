@@ -474,7 +474,7 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 	inode->i_sb = sb;
 	inode->i_op = &simplefs_inode_ops;
 	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-	inode->i_ino = 10;
+	inode->i_ino = SIMPLEFS_START_INO;
 
 	/* Loop until we get an unique inode number */
 	while (simplefs_get_inode(sb, inode->i_ino)) {
