@@ -318,11 +318,6 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 	sfs_inode = SIMPLEFS_INODE(inode);
 	sb = inode->i_sb;
 
-	if (*ppos + len >= SIMPLEFS_DEFAULT_BLOCK_SIZE) {
-		printk(KERN_ERR "File size write will exceed a block");
-		return -ENOSPC;
-	}
-
 	bh = sb_bread(filp->f_path.dentry->d_inode->i_sb,
 					    sfs_inode->data_block_number);
 
@@ -697,6 +692,8 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 
 	/* For all practical purposes, we will be using this s_fs_info as the super block */
 	sb->s_fs_info = sb_disk;
+
+	sb->s_maxbytes = SIMPLEFS_DEFAULT_BLOCK_SIZE;
 
 	root_inode = new_inode(sb);
 	root_inode->i_ino = SIMPLEFS_ROOTDIR_INODE_NUMBER;
