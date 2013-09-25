@@ -307,6 +307,13 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 	char *buffer;
 	int count;
 
+	int retval;
+
+	retval = generic_write_checks(filp, ppos, &len, 0);
+	if (retval) {
+		return retval;
+	}
+
 	inode = filp->f_path.dentry->d_inode;
 	sfs_inode = SIMPLEFS_INODE(inode);
 	sb = inode->i_sb;
