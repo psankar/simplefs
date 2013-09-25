@@ -41,6 +41,24 @@ void simplefs_sb_sync(struct super_block *vsb)
 	brelse(bh);
 }
 
+struct simplefs_inode *simplefs_inode_search(struct super_block *sb,
+		struct simplefs_inode *start,
+		struct simplefs_inode *search)
+{
+	uint64_t count = 0;
+	while (start->inode_no != search->inode_no
+			&& count < SIMPLEFS_SB(sb)->inodes_count) {
+		count++;
+		start++;
+	}
+
+	if (start->inode_no == search->inode_no) {
+		return start;
+	}
+
+	return NULL;
+}
+
 void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 {
 	struct simplefs_super_block *sb = SIMPLEFS_SB(vsb);
@@ -305,7 +323,6 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 	struct super_block *sb;
 
 	char *buffer;
-	int count;
 
 	int retval;
 
@@ -360,22 +377,17 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 
 	sfs_inode->file_size = *ppos;
 
-	inode_iterator = (struct simplefs_inode *)bh->b_data;
-
 	if (mutex_lock_interruptible(&simplefs_sb_lock)) {
 		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
 		       __FILE__, __LINE__);
 		return -EINTR;
 	}
 
-	count = 0;
-	while (inode_iterator->inode_no != sfs_inode->inode_no
-	       && count < SIMPLEFS_SB(sb)->inodes_count) {
-		count++;
-		inode_iterator++;
-	}
+	inode_iterator = simplefs_inode_search(sb,
+		(struct simplefs_inode *)bh->b_data,
+		sfs_inode);
 
-	if (likely(count < SIMPLEFS_SB(sb)->inodes_count)) {
+	if (likely(inode_iterator)) {
 		inode_iterator->file_size = sfs_inode->file_size;
 		printk(KERN_INFO
 		       "The new filesize that is written is: [%llu] and len was: [%lu]\n",
@@ -539,8 +551,6 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 
 	bh = sb_bread(sb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
 
-	inode_iterator = (struct simplefs_inode *)bh->b_data;
-
 	if (mutex_lock_interruptible(&simplefs_sb_lock)) {
 		mutex_unlock(&simplefs_inodes_mgmt_lock);
 		mutex_unlock(&simplefs_directory_children_update_lock);
@@ -549,14 +559,11 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 		return -EINTR;
 	}
 
-	count = 0;
-	while (inode_iterator->inode_no != parent_dir_inode->inode_no
-	       && count < SIMPLEFS_SB(sb)->inodes_count) {
-		count++;
-		inode_iterator++;
-	}
+	inode_iterator = simplefs_inode_search(sb,
+		(struct simplefs_inode *)bh->b_data,
+		parent_dir_inode);
 
-	if (likely(inode_iterator->inode_no == parent_dir_inode->inode_no)) {
+	if (inode_iterator) {
 		parent_dir_inode->dir_children_count++;
 		inode_iterator->dir_children_count =
 		    parent_dir_inode->dir_children_count;
