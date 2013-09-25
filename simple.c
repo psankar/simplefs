@@ -542,6 +542,8 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 	inode_iterator = (struct simplefs_inode *)bh->b_data;
 
 	if (mutex_lock_interruptible(&simplefs_sb_lock)) {
+		mutex_unlock(&simplefs_inodes_mgmt_lock);
+		mutex_unlock(&simplefs_directory_children_update_lock);
 		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
 		       __FILE__, __LINE__);
 		return -EINTR;
