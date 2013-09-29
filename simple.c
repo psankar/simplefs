@@ -253,10 +253,6 @@ struct simplefs_inode *simplefs_get_inode(struct super_block *sb,
 ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
 		      loff_t * ppos)
 {
-	/* Hack to make sure that we answer the read call only once and not loop infinitely.
-	 * We need to implement support for filesize in inode to remove this hack */
-	static int done = 0;
-
 	/* After the commit dd37978c5 in the upstream linux kernel,
 	 * we can use just filp->f_inode instead of the
 	 * f->f_path.dentry->d_inode redirection */
@@ -266,11 +262,6 @@ ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
 
 	char *buffer;
 	int nbytes;
-
-	if (done) {
-		done = 0;
-		return 0;
-	}
 
 	if (*ppos >= inode->file_size) {
 		/* Read request with offset beyond the filesize */
@@ -300,7 +291,6 @@ ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
 
 	*ppos += nbytes;
 
-	done = 1;
 	return nbytes;
 }
 
