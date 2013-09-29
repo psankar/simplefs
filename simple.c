@@ -66,8 +66,7 @@ void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 	struct simplefs_inode *inode_iterator;
 
 	if (mutex_lock_interruptible(&simplefs_inodes_mgmt_lock)) {
-		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
-		       __FILE__, __LINE__);
+		sfs_trace("Failed to acquire mutex lock\n");
 		return;
 	}
 
@@ -76,8 +75,7 @@ void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 	inode_iterator = (struct simplefs_inode *)bh->b_data;
 
 	if (mutex_lock_interruptible(&simplefs_sb_lock)) {
-		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
-		       __FILE__, __LINE__);
+		sfs_trace("Failed to acquire mutex lock\n");
 		return;
 	}
 
@@ -110,8 +108,7 @@ int simplefs_sb_get_a_freeblock(struct super_block *vsb, uint64_t * out)
 	int ret = 0;
 
 	if (mutex_lock_interruptible(&simplefs_sb_lock)) {
-		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
-		       __FILE__, __LINE__);
+		sfs_trace("Failed to acquire mutex lock\n");
 		ret = -EINTR;
 		goto end;
 	}
@@ -148,8 +145,7 @@ static int simplefs_sb_get_objects_count(struct super_block *vsb,
 	struct simplefs_super_block *sb = SIMPLEFS_SB(vsb);
 
 	if (mutex_lock_interruptible(&simplefs_inodes_mgmt_lock)) {
-		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
-		       __FILE__, __LINE__);
+		sfs_trace("Failed to acquire mutex lock\n");
 		return -EINTR;
 	}
 	*out = sb->inodes_count;
@@ -368,8 +364,7 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 	 * a shorter buffer */
 
 	if (mutex_lock_interruptible(&simplefs_inodes_mgmt_lock)) {
-		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
-		       __FILE__, __LINE__);
+		sfs_trace("Failed to acquire mutex lock\n");
 		return -EINTR;
 	}
 	/* Save the modified inode */
@@ -378,8 +373,7 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 	sfs_inode->file_size = *ppos;
 
 	if (mutex_lock_interruptible(&simplefs_sb_lock)) {
-		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
-		       __FILE__, __LINE__);
+		sfs_trace("Failed to acquire mutex lock\n");
 		return -EINTR;
 	}
 
@@ -452,8 +446,7 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 	int ret;
 
 	if (mutex_lock_interruptible(&simplefs_directory_children_update_lock)) {
-		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
-		       __FILE__, __LINE__);
+		sfs_trace("Failed to acquire mutex lock\n");
 		return -EINTR;
 	}
 	sb = dir->i_sb;
@@ -544,8 +537,7 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 
 	if (mutex_lock_interruptible(&simplefs_inodes_mgmt_lock)) {
 		mutex_unlock(&simplefs_directory_children_update_lock);
-		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
-		       __FILE__, __LINE__);
+		sfs_trace("Failed to acquire mutex lock\n");
 		return -EINTR;
 	}
 
@@ -554,8 +546,7 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 	if (mutex_lock_interruptible(&simplefs_sb_lock)) {
 		mutex_unlock(&simplefs_inodes_mgmt_lock);
 		mutex_unlock(&simplefs_directory_children_update_lock);
-		printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
-		       __FILE__, __LINE__);
+		sfs_trace("Failed to acquire mutex lock\n");
 		return -EINTR;
 	}
 

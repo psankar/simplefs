@@ -1,5 +1,6 @@
 obj-m := simplefs.o
 simplefs-objs := simple.o
+ccflags-y := -DSIMPLEFS_DEBUG
 
 all: ko mkfs-simplefs
 

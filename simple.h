@@ -1,7 +1,22 @@
+
+
 #define SIMPLEFS_MAGIC 0x10032013
 #define SIMPLEFS_DEFAULT_BLOCK_SIZE 4096
 #define SIMPLEFS_FILENAME_MAXLEN 255
 #define SIMPLEFS_START_INO 10
+
+#ifdef SIMPLEFS_DEBUG
+#define sfs_trace(fmt, ...) {                       \
+	printk(KERN_ERR "[simplefs] %s +%d:" fmt,       \
+	       __FILE__, __LINE__, ##__VA_ARGS__);      \
+}
+#define sfs_debug(level, fmt, ...) {                \
+	printk(level "[simplefs]:" fmt, ##__VA_ARGS__); \
+}
+#else
+#define sfs_trace(fmt, ...) no_printk(fmt, ##__VA_ARGS__)
+#define sfs_debug(level, fmt, ...) no_printk(fmt, ##__VA_ARGS__)
+#endif
 
 /* Hard-coded inode number for the root directory */
 const int SIMPLEFS_ROOTDIR_INODE_NUMBER = 1;
