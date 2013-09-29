@@ -65,6 +65,22 @@ function do_some_operations()
     echo "Second level directory" > hello
     cat hello
 }
+function do_read_operations()
+{
+    cd "$1"
+    ls -lR
+
+    cat vanakkam
+    cat hello
+
+    cat hello
+
+    cd dir1
+    cat hello
+
+    cd dir2
+    cat hello
+}
 function cleanup()
 {
     cat /proc/mounts | grep simplefs | awk '{print $2}' | xargs -r umount
@@ -93,7 +109,8 @@ unmount_fs "$test_mount_point"
 
 # 2
 mount_fs_image "$test_dir/image" "$test_mount_point"
-ls -lR "$test_mount_point"
+do_read_operations "$test_mount_point"
+cd "$root_pwd"
 unmount_fs "$test_mount_point"
 
 dmesg | tail -n40
