@@ -4,6 +4,11 @@
 #define SIMPLEFS_DEFAULT_BLOCK_SIZE 4096
 #define SIMPLEFS_FILENAME_MAXLEN 255
 #define SIMPLEFS_START_INO 10
+/**
+ * Reserver inodes for super block, inodestore
+ * and datablock
+ */
+#define SIMPLEFS_RESERVED_INODES 3
 
 #ifdef SIMPLEFS_DEBUG
 #define sfs_trace(fmt, ...) {                       \
