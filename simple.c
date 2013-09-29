@@ -3,6 +3,8 @@
  *
  * Initial author: Sankar P <sankar.curiosity@gmail.com>
  * License: Creative Commons Zero License - http://creativecommons.org/publicdomain/zero/1.0/
+ *
+ * TODO: we need to split it into smaller files
  */
 
 #include <linux/init.h>
@@ -221,6 +223,7 @@ struct simplefs_inode *simplefs_get_inode(struct super_block *sb,
 {
 	struct simplefs_super_block *sfs_sb = SIMPLEFS_SB(sb);
 	struct simplefs_inode *sfs_inode = NULL;
+	struct simplefs_inode *inode_buffer = NULL;
 
 	int i;
 	struct buffer_head *bh;
@@ -240,14 +243,20 @@ struct simplefs_inode *simplefs_get_inode(struct super_block *sb,
 #endif
 	for (i = 0; i < sfs_sb->inodes_count; i++) {
 		if (sfs_inode->inode_no == inode_no) {
-			/* FIXME: bh->b_data is probably leaking */
-			return sfs_inode;
+			/**
+			 * TODO: use slab allocator instead.
+			 */
+			inode_buffer = kmalloc(sizeof(*inode_buffer), GFP_KERNEL);
+			memcpy(inode_buffer, sfs_inode, sizeof(*inode_buffer));
+
+			break;
 		}
 		sfs_inode++;
 	}
 //      mutex_unlock(&simplefs_inodes_mgmt_lock);
 
-	return NULL;
+	brelse(bh);
+	return inode_buffer;
 }
 
 ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
@@ -388,7 +397,6 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 	 * FIXME: What to do if someone writes only some parts in between ?
 	 * The above code will also fail in case a file is overwritten with
 	 * a shorter buffer */
-
 	if (mutex_lock_interruptible(&simplefs_inodes_mgmt_lock)) {
 		sfs_trace("Failed to acquire mutex lock\n");
 		return -EINTR;
@@ -488,7 +496,6 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 		inode->i_ino++;
 	}
 
-	/* FIXME: This is leaking. We need to free all in-memory inodes sometime */
 	sfs_inode = kmalloc(sizeof(struct simplefs_inode), GFP_KERNEL);
 	sfs_inode->inode_no = inode->i_ino;
 	inode->i_private = sfs_inode;
@@ -597,10 +604,8 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 			struct inode *inode;
 			struct simplefs_inode *sfs_inode;
 
-			/* FIXME: This simplefs_inode is leaking */
 			sfs_inode = simplefs_get_inode(sb, record->inode_no);
 
-			/* FIXME: This inode is leaking */
 			inode = new_inode(sb);
 			inode->i_ino = record->inode_no;
 			inode_init_owner(inode, parent_inode, sfs_inode->mode);
@@ -633,6 +638,23 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 
 	return NULL;
 }
+
+
+/**
+ * Simplest
+ */
+void simplefs_destory_inode(struct inode *inode)
+{
+	struct simplefs_inode *sfs_inode = SIMPLEFS_INODE(inode);
+
+	printk(KERN_INFO "Freeing private data of inode %p (%lu)\n",
+	       sfs_inode, inode->i_ino);
+	kfree(sfs_inode);
+}
+
+static const struct super_operations simplefs_sops = {
+	.destroy_inode = simplefs_destory_inode,
+};
 
 /* This function, as the name implies, Makes the super_block valid and
  * fills filesystem specific information in the super block */
@@ -673,6 +695,7 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_fs_info = sb_disk;
 
 	sb->s_maxbytes = SIMPLEFS_DEFAULT_BLOCK_SIZE;
+	sb->s_op = &simplefs_sops;
 
 	root_inode = new_inode(sb);
 	root_inode->i_ino = SIMPLEFS_ROOTDIR_INODE_NUMBER;
