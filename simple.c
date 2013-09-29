@@ -304,6 +304,43 @@ ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
 	return nbytes;
 }
 
+/* Save the modified inode */
+int simplefs_inode_save(struct super_block *sb, struct simplefs_inode *sfs_inode)
+{
+	struct simplefs_inode *inode_iterator;
+	struct buffer_head *bh;
+
+	bh = sb_bread(sb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
+
+	if (mutex_lock_interruptible(&simplefs_sb_lock)) {
+		sfs_trace("Failed to acquire mutex lock\n");
+		return -EINTR;
+	}
+
+	inode_iterator = simplefs_inode_search(sb,
+		(struct simplefs_inode *)bh->b_data,
+		sfs_inode);
+
+	if (likely(inode_iterator)) {
+		memcpy(inode_iterator, sfs_inode, sizeof(*inode_iterator));
+		printk(KERN_INFO "The inode updated\n");
+
+		mark_buffer_dirty(bh);
+		sync_dirty_buffer(bh);
+	} else {
+		mutex_unlock(&simplefs_sb_lock);
+		printk(KERN_ERR
+		       "The new filesize could not be stored to the inode.");
+		return -EIO;
+	}
+
+	brelse(bh);
+
+	mutex_unlock(&simplefs_sb_lock);
+
+	return 0;
+}
+
 /* FIXME: The write support is rudimentary. I have not figured out a way to do writes
  * from particular offsets (even though I have written some untested code for this below) efficiently. */
 ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
@@ -314,7 +351,6 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 	 * f->f_path.dentry->d_inode redirection */
 	struct inode *inode;
 	struct simplefs_inode *sfs_inode;
-	struct simplefs_inode *inode_iterator;
 	struct buffer_head *bh;
 	struct super_block *sb;
 
@@ -367,37 +403,11 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 		sfs_trace("Failed to acquire mutex lock\n");
 		return -EINTR;
 	}
-	/* Save the modified inode */
-	bh = sb_bread(sb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
-
 	sfs_inode->file_size = *ppos;
-
-	if (mutex_lock_interruptible(&simplefs_sb_lock)) {
-		sfs_trace("Failed to acquire mutex lock\n");
-		return -EINTR;
+	retval = simplefs_inode_save(sb, sfs_inode);
+	if (retval) {
+		len = retval;
 	}
-
-	inode_iterator = simplefs_inode_search(sb,
-		(struct simplefs_inode *)bh->b_data,
-		sfs_inode);
-
-	if (likely(inode_iterator)) {
-		inode_iterator->file_size = sfs_inode->file_size;
-		printk(KERN_INFO
-		       "The new filesize that is written is: [%llu] and len was: [%lu]\n",
-		       sfs_inode->file_size, len);
-
-		mark_buffer_dirty(bh);
-		sync_dirty_buffer(bh);
-	} else {
-		printk(KERN_ERR
-		       "The new filesize could not be stored to the inode.");
-		len = -EIO;
-	}
-
-	brelse(bh);
-
-	mutex_unlock(&simplefs_sb_lock);
 	mutex_unlock(&simplefs_inodes_mgmt_lock);
 
 	return len;
@@ -437,7 +447,6 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 {
 	struct inode *inode;
 	struct simplefs_inode *sfs_inode;
-	struct simplefs_inode *inode_iterator;
 	struct super_block *sb;
 	struct simplefs_inode *parent_dir_inode;
 	struct buffer_head *bh;
@@ -541,38 +550,18 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 		return -EINTR;
 	}
 
-	bh = sb_bread(sb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
-
-	if (mutex_lock_interruptible(&simplefs_sb_lock)) {
+	parent_dir_inode->dir_children_count++;
+	ret = simplefs_inode_save(sb, parent_dir_inode);
+	if (ret) {
 		mutex_unlock(&simplefs_inodes_mgmt_lock);
 		mutex_unlock(&simplefs_directory_children_update_lock);
-		sfs_trace("Failed to acquire mutex lock\n");
-		return -EINTR;
-	}
 
-	inode_iterator = simplefs_inode_search(sb,
-		(struct simplefs_inode *)bh->b_data,
-		parent_dir_inode);
-
-	if (inode_iterator) {
-		parent_dir_inode->dir_children_count++;
-		inode_iterator->dir_children_count =
-		    parent_dir_inode->dir_children_count;
-		/* Updated the parent inode's dir count to reflect the new child too */
-
-		mark_buffer_dirty(bh);
-		sync_dirty_buffer(bh);
-	} else {
-		printk(KERN_ERR
-		       "The updated childcount could not be stored to the dir inode.");
 		/* TODO: Remove the newly created inode from the disk and in-memory inode store
 		 * and also update the superblock, freemaps etc. to reflect the same.
 		 * Basically, Undo all actions done during this create call */
+		return ret;
 	}
 
-	brelse(bh);
-
-	mutex_unlock(&simplefs_sb_lock);
 	mutex_unlock(&simplefs_inodes_mgmt_lock);
 	mutex_unlock(&simplefs_directory_children_update_lock);
 
