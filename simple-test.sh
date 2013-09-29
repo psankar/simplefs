@@ -64,6 +64,10 @@ function do_some_operations()
 
     echo "Second level directory" > hello
     cat hello
+
+    cp hello hello_smaller
+    echo "directory" > hello_smaller
+    cat hello_smaller
 }
 function do_read_operations()
 {
@@ -80,6 +84,7 @@ function do_read_operations()
 
     cd dir2
     cat hello
+    cat hello_smaller
 }
 function cleanup()
 {
