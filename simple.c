@@ -31,6 +31,8 @@ static DEFINE_MUTEX(simplefs_inodes_mgmt_lock);
  * done in parallel */
 static DEFINE_MUTEX(simplefs_directory_children_update_lock);
 
+static struct kmem_cache *sfs_inode_cachep;
+
 void simplefs_sb_sync(struct super_block *vsb)
 {
 	struct buffer_head *bh;
@@ -243,10 +245,7 @@ struct simplefs_inode *simplefs_get_inode(struct super_block *sb,
 #endif
 	for (i = 0; i < sfs_sb->inodes_count; i++) {
 		if (sfs_inode->inode_no == inode_no) {
-			/**
-			 * TODO: use slab allocator instead.
-			 */
-			inode_buffer = kmalloc(sizeof(*inode_buffer), GFP_KERNEL);
+			inode_buffer = kmem_cache_alloc(sfs_inode_cachep, GFP_KERNEL);
 			memcpy(inode_buffer, sfs_inode, sizeof(*inode_buffer));
 
 			break;
@@ -490,7 +489,7 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 	inode->i_ino = (count + SIMPLEFS_START_INO - SIMPLEFS_RESERVED_INODES + 1);
 
-	sfs_inode = kmalloc(sizeof(struct simplefs_inode), GFP_KERNEL);
+	sfs_inode = kmem_cache_alloc(sfs_inode_cachep, GFP_KERNEL);
 	sfs_inode->inode_no = inode->i_ino;
 	inode->i_private = sfs_inode;
 	sfs_inode->mode = mode;
@@ -643,7 +642,7 @@ void simplefs_destory_inode(struct inode *inode)
 
 	printk(KERN_INFO "Freeing private data of inode %p (%lu)\n",
 	       sfs_inode, inode->i_ino);
-	kfree(sfs_inode);
+	kmem_cache_free(sfs_inode_cachep, sfs_inode);
 }
 
 static const struct super_operations simplefs_sops = {
@@ -764,6 +763,15 @@ static int simplefs_init(void)
 {
 	int ret;
 
+	sfs_inode_cachep = kmem_cache_create("sfs_inode_cache",
+	                                     sizeof(struct simplefs_inode),
+	                                     0,
+	                                     (SLAB_RECLAIM_ACCOUNT| SLAB_MEM_SPREAD),
+	                                     NULL);
+	if (!sfs_inode_cachep) {
+		return -ENOMEM;
+	}
+
 	ret = register_filesystem(&simplefs_fs_type);
 	if (likely(ret == 0))
 		printk(KERN_INFO "Sucessfully registered simplefs\n");
@@ -778,6 +786,7 @@ static void simplefs_exit(void)
 	int ret;
 
 	ret = unregister_filesystem(&simplefs_fs_type);
+	kmem_cache_destroy(sfs_inode_cachep);
 
 	if (likely(ret == 0))
 		printk(KERN_INFO "Sucessfully unregistered simplefs\n");
