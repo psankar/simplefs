@@ -592,7 +592,7 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 			 * is not written to the inode store, but the inodes_count is
 			 * incremented. Then if the random string on the disk matches
 			 * with the filename that we are comparing above, then we
-			 * will use an invalid unintialized inode */
+			 * will use an invalid uninitialized inode */
 
 			struct inode *inode;
 			struct simplefs_inode *sfs_inode;
