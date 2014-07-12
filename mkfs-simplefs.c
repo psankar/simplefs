@@ -9,8 +9,8 @@
 
 #include "simple.h"
 
-const uint64_t WELCOMEFILE_DATABLOCK_NUMBER = 3;
-const uint64_t WELCOMEFILE_INODE_NUMBER = 2;
+#define WELCOMEFILE_DATABLOCK_NUMBER (SIMPLEFS_LAST_RESERVED_BLOCK + 1)
+#define WELCOMEFILE_INODE_NUMBER (SIMPLEFS_LAST_RESERVED_INODE + 1)
 
 static int write_superblock(int fd)
 {
@@ -18,10 +18,9 @@ static int write_superblock(int fd)
 		.version = 1,
 		.magic = SIMPLEFS_MAGIC,
 		.block_size = SIMPLEFS_DEFAULT_BLOCK_SIZE,
-		/* One inode for rootdirectory and another for a welcome file that we are going to create */
-		.inodes_count = 2,
+		.inodes_count = WELCOMEFILE_INODE_NUMBER,
 		/* FIXME: Free blocks management is not implemented yet */
-		.free_blocks = (~0) & ~(1 << WELCOMEFILE_DATABLOCK_NUMBER),
+		.free_blocks = (~0) & ~(1 << SIMPLEFS_LAST_RESERVED_BLOCK),
 	};
 	ssize_t ret;
 
@@ -37,7 +36,7 @@ static int write_superblock(int fd)
 	return 0;
 }
 
-static int write_inode_store(int fd)
+static int write_root_inode(int fd)
 {
 	ssize_t ret;
 
@@ -59,8 +58,26 @@ static int write_inode_store(int fd)
 	printf("root directory inode written succesfully\n");
 	return 0;
 }
+static int write_journal_inode(int fd)
+{
+	ssize_t ret;
 
-static int write_inode(int fd, const struct simplefs_inode *i)
+	struct simplefs_inode journal;
+
+	journal.inode_no = SIMPLEFS_JOURNAL_INODE_NUMBER;
+	journal.data_block_number = SIMPLEFS_JOURNAL_BLOCK_NUMBER;
+
+	ret = write(fd, &journal, sizeof(journal));
+
+	if (ret != sizeof(journal)) {
+		printf("Error while writing journal inode. Retry your mkfs\n");
+		return -1;
+	}
+
+	printf("journal inode written succesfully\n");
+	return 0;
+}
+static int write_welcome_inode(int fd, const struct simplefs_inode *i)
 {
 	off_t nbytes;
 	ssize_t ret;
@@ -73,7 +90,7 @@ static int write_inode(int fd, const struct simplefs_inode *i)
 	}
 	printf("welcomefile inode written succesfully\n");
 
-	nbytes = SIMPLEFS_DEFAULT_BLOCK_SIZE - sizeof(*i) - sizeof(*i);
+	nbytes = SIMPLEFS_DEFAULT_BLOCK_SIZE - (sizeof(*i) * 3);
 	ret = lseek(fd, nbytes, SEEK_CUR);
 	if (ret == (off_t)-1) {
 		printf
@@ -82,9 +99,23 @@ static int write_inode(int fd, const struct simplefs_inode *i)
 	}
 
 	printf
-	    ("inode store padding bytes (after the two inodes) written sucessfully\n");
+	    ("inode store padding bytes (after the three inodes) written sucessfully\n");
 	return 0;
 }
+
+int write_journal(int fd)
+{
+	ssize_t ret;
+	ret = lseek(fd, SIMPLEFS_DEFAULT_BLOCK_SIZE * SIMPLEFS_JOURNAL_BLOCKS, SEEK_CUR);
+	if (ret == (off_t)-1) {
+		printf("Can't write journal. Retry you mkfs\n");
+		return -1;
+	}
+
+	printf("Journal written successfully\n");
+	return 0;
+}
+
 int write_dirent(int fd, const struct simplefs_dir_record *record)
 {
 	ssize_t nbytes = sizeof(*record), ret;
@@ -154,11 +185,17 @@ int main(int argc, char *argv[])
 	do {
 		if (write_superblock(fd))
 			break;
-		if (write_inode_store(fd))
+
+		if (write_root_inode(fd))
+			break;
+		if (write_journal_inode(fd))
+			break;
+		if (write_welcome_inode(fd, &welcome))
 			break;
 
-		if (write_inode(fd, &welcome))
+		if (write_journal(fd))
 			break;
+
 		if (write_dirent(fd, &record))
 			break;
 		if (write_block(fd, welcomefile_body, welcome.file_size))

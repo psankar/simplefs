@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/version.h>
+#include <linux/jbd2.h>
 
 #include "super.h"
 
@@ -584,6 +585,35 @@ static int simplefs_create(struct inode *dir, struct dentry *dentry,
 	return simplefs_create_fs_object(dir, dentry, mode);
 }
 
+static struct inode *simplefs_iget(struct super_block *sb, int ino)
+{
+	struct inode *inode;
+	struct simplefs_inode *sfs_inode;
+
+	sfs_inode = simplefs_get_inode(sb, ino);
+
+	inode = new_inode(sb);
+	inode->i_ino = ino;
+	inode->i_sb = sb;
+	inode->i_op = &simplefs_inode_ops;
+
+	if (S_ISDIR(sfs_inode->mode))
+		inode->i_fop = &simplefs_dir_operations;
+	else if (S_ISREG(sfs_inode->mode) || ino == SIMPLEFS_JOURNAL_INODE_NUMBER)
+		inode->i_fop = &simplefs_file_operations;
+	else
+		printk(KERN_ERR
+					 "Unknown inode type. Neither a directory nor a file");
+
+	/* FIXME: We should store these times to disk and retrieve them */
+	inode->i_atime = inode->i_mtime = inode->i_ctime =
+			CURRENT_TIME;
+
+	inode->i_private = sfs_inode;
+
+	return inode;
+}
+
 struct dentry *simplefs_lookup(struct inode *parent_inode,
 			       struct dentry *child_dentry, unsigned int flags)
 {
@@ -605,31 +635,8 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 			 * with the filename that we are comparing above, then we
 			 * will use an invalid uninitialized inode */
 
-			struct inode *inode;
-			struct simplefs_inode *sfs_inode;
-
-			sfs_inode = simplefs_get_inode(sb, record->inode_no);
-
-			inode = new_inode(sb);
-			inode->i_ino = record->inode_no;
-			inode_init_owner(inode, parent_inode, sfs_inode->mode);
-			inode->i_sb = sb;
-			inode->i_op = &simplefs_inode_ops;
-
-			if (S_ISDIR(inode->i_mode))
-				inode->i_fop = &simplefs_dir_operations;
-			else if (S_ISREG(inode->i_mode))
-				inode->i_fop = &simplefs_file_operations;
-			else
-				printk(KERN_ERR
-				       "Unknown inode type. Neither a directory nor a file");
-
-			/* FIXME: We should store these times to disk and retrieve them */
-			inode->i_atime = inode->i_mtime = inode->i_ctime =
-			    CURRENT_TIME;
-
-			inode->i_private = sfs_inode;
-
+			struct inode *inode = simplefs_iget(sb, record->inode_no);
+			inode_init_owner(inode, parent_inode, SIMPLEFS_INODE(inode)->mode);
 			d_add(child_dentry, inode);
 			return NULL;
 		}
@@ -656,9 +663,34 @@ void simplefs_destory_inode(struct inode *inode)
 	kmem_cache_free(sfs_inode_cachep, sfs_inode);
 }
 
+static void simplefs_put_super(struct super_block *sb)
+{
+	struct simplefs_super_block *sfs_sb = SIMPLEFS_SB(sb);
+	if (sfs_sb->journal)
+		WARN_ON(jbd2_journal_destroy(sfs_sb->journal) < 0);
+	sfs_sb->journal = NULL;
+}
+
 static const struct super_operations simplefs_sops = {
 	.destroy_inode = simplefs_destory_inode,
+	.put_super = simplefs_put_super,
 };
+
+static int simplefs_load_journal(struct super_block *sb)
+{
+	struct journal_s *journal;
+	struct inode *inode;
+	struct simplefs_super_block *sfs_sb = SIMPLEFS_SB(sb);
+
+	inode = simplefs_iget(sb, SIMPLEFS_JOURNAL_INODE_NUMBER);
+
+	journal = jbd2_journal_init_inode(inode);
+	journal->j_private = sb;
+
+	sfs_sb->journal = journal;
+
+	return 0;
+}
 
 /* This function, as the name implies, Makes the super_block valid and
  * fills filesystem specific information in the super block */
@@ -727,6 +759,9 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 		ret = -ENOMEM;
 		goto release;
 	}
+
+	if ((ret = simplefs_load_journal(sb)))
+		goto release;
 
 	ret = 0;
 release:
