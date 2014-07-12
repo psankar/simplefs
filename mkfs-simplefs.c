@@ -14,19 +14,16 @@ const uint64_t WELCOMEFILE_INODE_NUMBER = 2;
 
 static int write_superblock(int fd)
 {
-	struct simplefs_super_block sb;
+	struct simplefs_super_block sb = {
+		.version = 1,
+		.magic = SIMPLEFS_MAGIC,
+		.block_size = SIMPLEFS_DEFAULT_BLOCK_SIZE,
+		/* One inode for rootdirectory and another for a welcome file that we are going to create */
+		.inodes_count = 2,
+		/* FIXME: Free blocks management is not implemented yet */
+		.free_blocks = (~0) & ~(1 << WELCOMEFILE_DATABLOCK_NUMBER),
+	};
 	ssize_t ret;
-
-	sb.version = 1;
-	sb.magic = SIMPLEFS_MAGIC;
-	sb.block_size = SIMPLEFS_DEFAULT_BLOCK_SIZE;
-
-	/* One inode for rootdirectory and another for a welcome file that we are going to create */
-	sb.inodes_count = 2;
-
-	/* FIXME: Free blocks management is not implemented yet */
-	sb.free_blocks = ~0;
-	sb.free_blocks &= ~(1 << WELCOMEFILE_DATABLOCK_NUMBER);
 
 	ret = write(fd, &sb, sizeof(sb));
 	if (ret != SIMPLEFS_DEFAULT_BLOCK_SIZE) {
