@@ -39,6 +39,8 @@ void simplefs_sb_sync(struct super_block *vsb)
 	struct simplefs_super_block *sb = SIMPLEFS_SB(vsb);
 
 	bh = sb_bread(vsb, SIMPLEFS_SUPERBLOCK_BLOCK_NUMBER);
+	BUG_ON(!bh);
+
 	bh->b_data = (char *)sb;
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
@@ -75,6 +77,7 @@ void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 	}
 
 	bh = sb_bread(vsb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
+	BUG_ON(!bh);
 
 	inode_iterator = (struct simplefs_inode *)bh->b_data;
 
@@ -198,6 +201,7 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	}
 
 	bh = sb_bread(sb, sfs_inode->data_block_number);
+	BUG_ON(!bh);
 
 	record = (struct simplefs_dir_record *)bh->b_data;
 	for (i = 0; i < sfs_inode->dir_children_count; i++) {
@@ -234,6 +238,8 @@ struct simplefs_inode *simplefs_get_inode(struct super_block *sb,
 	 * But such a model will not be scalable in a filesystem with
 	 * millions or billions of files (inodes) */
 	bh = sb_bread(sb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
+	BUG_ON(!bh);
+
 	sfs_inode = (struct simplefs_inode *)bh->b_data;
 
 #if 0
@@ -309,6 +315,7 @@ int simplefs_inode_save(struct super_block *sb, struct simplefs_inode *sfs_inode
 	struct buffer_head *bh;
 
 	bh = sb_bread(sb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
+	BUG_ON(!bh);
 
 	if (mutex_lock_interruptible(&simplefs_sb_lock)) {
 		sfs_trace("Failed to acquire mutex lock\n");
@@ -522,6 +529,8 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 
 	parent_dir_inode = SIMPLEFS_INODE(dir);
 	bh = sb_bread(sb, parent_dir_inode->data_block_number);
+	BUG_ON(!bh);
+
 	dir_contents_datablock = (struct simplefs_dir_record *)bh->b_data;
 
 	/* Navigate to the last record in the directory contents */
@@ -585,6 +594,8 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 	int i;
 
 	bh = sb_bread(sb, parent->data_block_number);
+	BUG_ON(!bh);
+
 	record = (struct simplefs_dir_record *)bh->b_data;
 	for (i = 0; i < parent->dir_children_count; i++) {
 		if (!strcmp(record->filename, child_dentry->d_name.name)) {
@@ -659,6 +670,7 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 	int ret = -EPERM;
 
 	bh = sb_bread(sb, SIMPLEFS_SUPERBLOCK_BLOCK_NUMBER);
+	BUG_ON(!bh);
 
 	sb_disk = (struct simplefs_super_block *)bh->b_data;
 
