@@ -15,6 +15,8 @@
 #include <linux/random.h>
 #include <linux/version.h>
 #include <linux/jbd2.h>
+#include <linux/parser.h>
+#include <linux/blkdev.h>
 
 #include "super.h"
 
@@ -700,18 +702,57 @@ static const struct super_operations simplefs_sops = {
 	.put_super = simplefs_put_super,
 };
 
-static int simplefs_load_journal(struct super_block *sb)
+static int simplefs_load_journal(struct super_block *sb, int devnum)
 {
 	struct journal_s *journal;
-	struct inode *inode;
+	dev_t dev;
+	struct block_device *bdev;
+	int hblock, blocksize, len;
 	struct simplefs_super_block *sfs_sb = SIMPLEFS_SB(sb);
 
-	inode = simplefs_iget(sb, SIMPLEFS_JOURNAL_INODE_NUMBER);
+	dev = new_decode_dev(devnum);
+	bdev = blkdev_get_by_dev(dev, FMODE_READ|FMODE_WRITE|FMODE_EXCL, sb);
+	if (IS_ERR(bdev))
+		return 1;
+	blocksize = sb->s_blocksize;
+	hblock = bdev_logical_block_size(bdev);
+	len = SIMPLEFS_MAX_FILESYSTEM_OBJECTS_SUPPORTED;
 
-	journal = jbd2_journal_init_inode(inode);
+	journal = jbd2_journal_init_dev(bdev, sb->s_bdev, 1, len, blocksize);
 	journal->j_private = sb;
 
 	sfs_sb->journal = journal;
+
+	return 0;
+}
+
+#define SIMPLEFS_OPT_JOURNAL_DEV 1
+static const match_table_t tokens = {
+	{SIMPLEFS_OPT_JOURNAL_DEV, "journal_dev=%u"},
+};
+static int simplefs_parse_options(struct super_block *sb, char *options)
+{
+	substring_t args[MAX_OPT_ARGS];
+	int token, ret, arg;
+	char *p;
+
+	while ((p = strsep(&options, ",")) != NULL) {
+		if (!*p)
+			continue;
+
+		args[0].to = args[0].from = NULL;
+		token = match_token(p, tokens, args);
+
+		switch (token) {
+			case SIMPLEFS_OPT_JOURNAL_DEV:
+				if (args->from && match_int(args, &arg))
+					return 1;
+				printk(KERN_INFO "Loading journal devnum: %i\n", arg);
+				if ((ret = simplefs_load_journal(sb, arg)))
+					return ret;
+				break;
+		}
+	}
 
 	return 0;
 }
@@ -784,7 +825,7 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 		goto release;
 	}
 
-	if ((ret = simplefs_load_journal(sb)))
+	if ((ret = simplefs_parse_options(sb, data)))
 		goto release;
 
 	ret = 0;
