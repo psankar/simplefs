@@ -722,6 +722,10 @@ static int simplefs_load_journal(struct super_block *sb, int devnum)
 	len = SIMPLEFS_MAX_FILESYSTEM_OBJECTS_SUPPORTED;
 
 	journal = jbd2_journal_init_dev(bdev, sb->s_bdev, 1, len, blocksize);
+	if (!journal) {
+		printk(KERN_ERR "Can't load journal\n");
+		return 1;
+	}
 	journal->j_private = sb;
 
 	sfs_sb->journal = journal;
