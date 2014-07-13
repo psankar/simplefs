@@ -705,12 +705,15 @@ static const struct super_operations simplefs_sops = {
 static int simplefs_load_journal(struct super_block *sb, int devnum)
 {
 	struct journal_s *journal;
+	char b[BDEVNAME_SIZE];
 	dev_t dev;
 	struct block_device *bdev;
 	int hblock, blocksize, len;
 	struct simplefs_super_block *sfs_sb = SIMPLEFS_SB(sb);
 
 	dev = new_decode_dev(devnum);
+	printk(KERN_INFO "Journal device is: %s\n", __bdevname(dev, b));
+
 	bdev = blkdev_get_by_dev(dev, FMODE_READ|FMODE_WRITE|FMODE_EXCL, sb);
 	if (IS_ERR(bdev))
 		return 1;
