@@ -651,9 +651,14 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 
 	bh = sb_bread(sb, parent->data_block_number);
 	BUG_ON(!bh);
+	sfs_trace("Lookup in: ino=%llu, b=%llu\n",
+				parent->inode_no, parent->data_block_number);
 
 	record = (struct simplefs_dir_record *)bh->b_data;
 	for (i = 0; i < parent->dir_children_count; i++) {
+		sfs_trace("Have file: '%s' (ino=%llu)\n",
+					record->filename, record->inode_no);
+
 		if (!strcmp(record->filename, child_dentry->d_name.name)) {
 			/* FIXME: There is a corner case where if an allocated inode,
 			 * is not written to the inode store, but the inodes_count is
