@@ -801,8 +801,15 @@ static int simplefs_parse_options(struct super_block *sb, char *options)
 				path_put(&path);
 				kfree(journal_path);
 
-				if ((ret = simplefs_sb_load_journal(sb, journal_inode)))
-					return ret;
+				if (S_ISBLK(journal_inode->i_mode)) {
+					unsigned long journal_devnum = new_encode_dev(journal_inode->i_rdev);
+					if ((ret = simplefs_load_journal(sb, journal_devnum)))
+						return ret;
+				} else {
+					/** Seems didn't work properly */
+					if ((ret = simplefs_sb_load_journal(sb, journal_inode)))
+						return ret;
+				}
 
 				break;
 			}
