@@ -25,7 +25,7 @@ test_journal_dev=""
 function create_journal()
 {
     dd bs=1M count=10 if=/dev/zero of="$1"
-    mke2fs -O journal_dev "$1"
+    mke2fs -b 4096 -O journal_dev "$1"
 }
 function create_test_image()
 {
