@@ -20,6 +20,7 @@ echo 1 >| /sys/module/jbd2/parameters/jbd2_debug
 root_pwd="$PWD"
 test_dir="test-dir-$RANDOM"
 test_mount_point="test-mount-point-$RANDOM"
+test_journal_dev=""
 
 function create_journal()
 {
@@ -34,12 +35,14 @@ function create_test_image()
 function mount_fs_image()
 {
     insmod simplefs.ko
-    mount -o loop,owner,group,users,journal_path="$1" -t simplefs "$2" "$3"
+    test_journal_dev=$(losetup -f --show "$1")
+    mount -o loop,owner,group,users,journal_path="$test_journal_dev" -t simplefs "$2" "$3"
     dmesg | tail -n20
 }
 function unmount_fs()
 {
     umount "$1"
+    losetup -d $test_journal_dev
     rmmod simplefs.ko
     dmesg | tail -n20
 }
