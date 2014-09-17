@@ -89,7 +89,7 @@ function do_read_operations()
 function cleanup()
 {
     cd "$root_pwd"
-    cat /proc/mounts | awk '$3 ~ /^simplefs$/ {print $2}' | xargs -r umount
+    umount -t simplefs "$test_mount_point"
     lsmod | grep -q simplefs && rmmod "$root_pwd/simplefs.ko"
 
     # TODO: prompt deletion
