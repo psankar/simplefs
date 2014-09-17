@@ -737,6 +737,24 @@ static int simplefs_load_journal(struct super_block *sb, int devnum)
 
 	return 0;
 }
+static int simplefs_sb_load_journal(struct super_block *sb)
+{
+	struct journal_s *journal;
+	struct simplefs_super_block *sfs_sb = SIMPLEFS_SB(sb);
+	struct inode *journal_inode;
+
+	journal_inode = simplefs_iget(sb, SIMPLEFS_JOURNAL_INODE_NUMBER);
+	journal = jbd2_journal_init_inode(journal_inode);
+	if (!journal) {
+		printk(KERN_ERR "Can't load journal\n");
+		return 1;
+	}
+	journal->j_private = sb;
+
+	sfs_sb->journal = journal;
+
+	return 0;
+}
 
 #define SIMPLEFS_OPT_JOURNAL_DEV 1
 static const match_table_t tokens = {
@@ -797,6 +815,8 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 		       "simplefs seem to be formatted using a non-standard block size.");
 		goto release;
 	}
+	/** XXX: Avoid this hack, by adding one more sb wrapper, but non-disk */
+	sb_disk->journal = NULL;
 
 	printk(KERN_INFO
 	       "simplefs filesystem of version [%llu] formatted with a block size of [%llu] detected in the device.\n",
@@ -839,6 +859,10 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 
 	if ((ret = simplefs_parse_options(sb, data)))
 		goto release;
+
+	if (!sb_disk->journal && (ret = simplefs_sb_load_journal(sb))) {
+		goto release;
+	}
 
 	ret = 0;
 release:
