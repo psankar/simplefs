@@ -892,8 +892,8 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 		ret = simplefs_sb_load_journal(sb, journal_inode);
 		goto release;
 	}
+	ret = jbd2_journal_load(sb_disk->journal);
 
-	ret = 0;
 release:
 	brelse(bh);
 
