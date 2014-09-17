@@ -15,6 +15,8 @@
 
 set -e
 
+echo 1 >| /sys/module/jbd2/parameters/jbd2_debug
+
 root_pwd="$PWD"
 test_dir="test-dir-$RANDOM"
 test_mount_point="test-mount-point-$RANDOM"
