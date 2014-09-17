@@ -727,7 +727,7 @@ static int simplefs_load_journal(struct super_block *sb, int devnum)
 	hblock = bdev_logical_block_size(bdev);
 	len = SIMPLEFS_MAX_FILESYSTEM_OBJECTS_SUPPORTED;
 
-	journal = jbd2_journal_init_dev(bdev, sb->s_bdev, 1, len, blocksize);
+	journal = jbd2_journal_init_dev(bdev, sb->s_bdev, 1, -1, blocksize);
 	if (!journal) {
 		printk(KERN_ERR "Can't load journal\n");
 		return 1;
