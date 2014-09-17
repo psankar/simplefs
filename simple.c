@@ -10,6 +10,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/fs.h>
+#include <linux/namei.h>
 #include <linux/buffer_head.h>
 #include <linux/slab.h>
 #include <linux/random.h>
@@ -737,14 +738,12 @@ static int simplefs_load_journal(struct super_block *sb, int devnum)
 
 	return 0;
 }
-static int simplefs_sb_load_journal(struct super_block *sb)
+static int simplefs_sb_load_journal(struct super_block *sb, struct inode *inode)
 {
 	struct journal_s *journal;
 	struct simplefs_super_block *sfs_sb = SIMPLEFS_SB(sb);
-	struct inode *journal_inode;
 
-	journal_inode = simplefs_iget(sb, SIMPLEFS_JOURNAL_INODE_NUMBER);
-	journal = jbd2_journal_init_inode(journal_inode);
+	journal = jbd2_journal_init_inode(inode);
 	if (!journal) {
 		printk(KERN_ERR "Can't load journal\n");
 		return 1;
@@ -757,8 +756,10 @@ static int simplefs_sb_load_journal(struct super_block *sb)
 }
 
 #define SIMPLEFS_OPT_JOURNAL_DEV 1
+#define SIMPLEFS_OPT_JOURNAL_PATH 2
 static const match_table_t tokens = {
 	{SIMPLEFS_OPT_JOURNAL_DEV, "journal_dev=%u"},
+	{SIMPLEFS_OPT_JOURNAL_PATH, "journal_path=%s"},
 };
 static int simplefs_parse_options(struct super_block *sb, char *options)
 {
@@ -781,6 +782,30 @@ static int simplefs_parse_options(struct super_block *sb, char *options)
 				if ((ret = simplefs_load_journal(sb, arg)))
 					return ret;
 				break;
+
+			case SIMPLEFS_OPT_JOURNAL_PATH:
+			{
+				char *journal_path;
+				struct inode *journal_inode;
+				struct path path;
+
+				BUG_ON(!(journal_path = match_strdup(&args[0])));
+				ret = kern_path(journal_path, LOOKUP_FOLLOW, &path);
+				if (ret) {
+					printk(KERN_ERR "could not find journal device path: error %d\n", ret);
+					kfree(journal_path);
+				}
+
+				journal_inode = path.dentry->d_inode;
+
+				path_put(&path);
+				kfree(journal_path);
+
+				if ((ret = simplefs_sb_load_journal(sb, journal_inode)))
+					return ret;
+
+				break;
+			}
 		}
 	}
 
@@ -860,7 +885,11 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 	if ((ret = simplefs_parse_options(sb, data)))
 		goto release;
 
-	if (!sb_disk->journal && (ret = simplefs_sb_load_journal(sb))) {
+	if (!sb_disk->journal) {
+		struct inode *journal_inode;
+		journal_inode = simplefs_iget(sb, SIMPLEFS_JOURNAL_INODE_NUMBER);
+
+		ret = simplefs_sb_load_journal(sb, journal_inode);
 		goto release;
 	}
 
