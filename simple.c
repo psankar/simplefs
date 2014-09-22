@@ -415,6 +415,7 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 		brelse(bh);
 		return retval;
 	}
+	handle->h_sync = 1;
 	retval = jbd2_journal_stop(handle);
 	if (WARN_ON(retval)) {
 		brelse(bh);
