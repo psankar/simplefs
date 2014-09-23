@@ -57,6 +57,7 @@ install linux kernel sources and run make from the checkedout directory.
 
 To test:
 ---------
+And here is the build environment for simplefs: https://github.com/azat/simplefs-bld
 
 psankar@linux-9dni:~/src/simplefs> make
 
