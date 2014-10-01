@@ -10,10 +10,14 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/fs.h>
+#include <linux/namei.h>
 #include <linux/buffer_head.h>
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/version.h>
+#include <linux/jbd2.h>
+#include <linux/parser.h>
+#include <linux/blkdev.h>
 
 #include "super.h"
 
@@ -358,19 +362,25 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 	struct simplefs_inode *sfs_inode;
 	struct buffer_head *bh;
 	struct super_block *sb;
+	struct simplefs_super_block *sfs_sb;
+	handle_t *handle;
 
 	char *buffer;
 
 	int retval;
 
+	sb = filp->f_path.dentry->d_inode->i_sb;
+	sfs_sb = SIMPLEFS_SB(sb);
+
+	handle = jbd2_journal_start(sfs_sb->journal, 1);
+	if (IS_ERR(handle))
+		return PTR_ERR(handle);
 	retval = generic_write_checks(filp, ppos, &len, 0);
-	if (retval) {
+	if (retval)
 		return retval;
-	}
 
 	inode = filp->f_path.dentry->d_inode;
 	sfs_inode = SIMPLEFS_INODE(inode);
-	sb = inode->i_sb;
 
 	bh = sb_bread(filp->f_path.dentry->d_inode->i_sb,
 					    sfs_inode->data_block_number);
@@ -385,6 +395,13 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 	/* Move the pointer until the required byte offset */
 	buffer += *ppos;
 
+	retval = jbd2_journal_get_write_access(handle, bh);
+	if (WARN_ON(retval)) {
+		brelse(bh);
+		sfs_trace("Can't get write access for bh\n");
+		return retval;
+	}
+
 	if (copy_from_user(buffer, buf, len)) {
 		brelse(bh);
 		printk(KERN_ERR
@@ -392,6 +409,18 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 		return -EFAULT;
 	}
 	*ppos += len;
+
+	retval = jbd2_journal_dirty_metadata(handle, bh);
+	if (WARN_ON(retval)) {
+		brelse(bh);
+		return retval;
+	}
+	handle->h_sync = 1;
+	retval = jbd2_journal_stop(handle);
+	if (WARN_ON(retval)) {
+		brelse(bh);
+		return retval;
+	}
 
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
@@ -584,6 +613,35 @@ static int simplefs_create(struct inode *dir, struct dentry *dentry,
 	return simplefs_create_fs_object(dir, dentry, mode);
 }
 
+static struct inode *simplefs_iget(struct super_block *sb, int ino)
+{
+	struct inode *inode;
+	struct simplefs_inode *sfs_inode;
+
+	sfs_inode = simplefs_get_inode(sb, ino);
+
+	inode = new_inode(sb);
+	inode->i_ino = ino;
+	inode->i_sb = sb;
+	inode->i_op = &simplefs_inode_ops;
+
+	if (S_ISDIR(sfs_inode->mode))
+		inode->i_fop = &simplefs_dir_operations;
+	else if (S_ISREG(sfs_inode->mode) || ino == SIMPLEFS_JOURNAL_INODE_NUMBER)
+		inode->i_fop = &simplefs_file_operations;
+	else
+		printk(KERN_ERR
+					 "Unknown inode type. Neither a directory nor a file");
+
+	/* FIXME: We should store these times to disk and retrieve them */
+	inode->i_atime = inode->i_mtime = inode->i_ctime =
+			CURRENT_TIME;
+
+	inode->i_private = sfs_inode;
+
+	return inode;
+}
+
 struct dentry *simplefs_lookup(struct inode *parent_inode,
 			       struct dentry *child_dentry, unsigned int flags)
 {
@@ -595,9 +653,14 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 
 	bh = sb_bread(sb, parent->data_block_number);
 	BUG_ON(!bh);
+	sfs_trace("Lookup in: ino=%llu, b=%llu\n",
+				parent->inode_no, parent->data_block_number);
 
 	record = (struct simplefs_dir_record *)bh->b_data;
 	for (i = 0; i < parent->dir_children_count; i++) {
+		sfs_trace("Have file: '%s' (ino=%llu)\n",
+					record->filename, record->inode_no);
+
 		if (!strcmp(record->filename, child_dentry->d_name.name)) {
 			/* FIXME: There is a corner case where if an allocated inode,
 			 * is not written to the inode store, but the inodes_count is
@@ -605,31 +668,8 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 			 * with the filename that we are comparing above, then we
 			 * will use an invalid uninitialized inode */
 
-			struct inode *inode;
-			struct simplefs_inode *sfs_inode;
-
-			sfs_inode = simplefs_get_inode(sb, record->inode_no);
-
-			inode = new_inode(sb);
-			inode->i_ino = record->inode_no;
-			inode_init_owner(inode, parent_inode, sfs_inode->mode);
-			inode->i_sb = sb;
-			inode->i_op = &simplefs_inode_ops;
-
-			if (S_ISDIR(inode->i_mode))
-				inode->i_fop = &simplefs_dir_operations;
-			else if (S_ISREG(inode->i_mode))
-				inode->i_fop = &simplefs_file_operations;
-			else
-				printk(KERN_ERR
-				       "Unknown inode type. Neither a directory nor a file");
-
-			/* FIXME: We should store these times to disk and retrieve them */
-			inode->i_atime = inode->i_mtime = inode->i_ctime =
-			    CURRENT_TIME;
-
-			inode->i_private = sfs_inode;
-
+			struct inode *inode = simplefs_iget(sb, record->inode_no);
+			inode_init_owner(inode, parent_inode, SIMPLEFS_INODE(inode)->mode);
 			d_add(child_dentry, inode);
 			return NULL;
 		}
@@ -656,9 +696,129 @@ void simplefs_destory_inode(struct inode *inode)
 	kmem_cache_free(sfs_inode_cachep, sfs_inode);
 }
 
+static void simplefs_put_super(struct super_block *sb)
+{
+	struct simplefs_super_block *sfs_sb = SIMPLEFS_SB(sb);
+	if (sfs_sb->journal)
+		WARN_ON(jbd2_journal_destroy(sfs_sb->journal) < 0);
+	sfs_sb->journal = NULL;
+}
+
 static const struct super_operations simplefs_sops = {
 	.destroy_inode = simplefs_destory_inode,
+	.put_super = simplefs_put_super,
 };
+
+static int simplefs_load_journal(struct super_block *sb, int devnum)
+{
+	struct journal_s *journal;
+	char b[BDEVNAME_SIZE];
+	dev_t dev;
+	struct block_device *bdev;
+	int hblock, blocksize, len;
+	struct simplefs_super_block *sfs_sb = SIMPLEFS_SB(sb);
+
+	dev = new_decode_dev(devnum);
+	printk(KERN_INFO "Journal device is: %s\n", __bdevname(dev, b));
+
+	bdev = blkdev_get_by_dev(dev, FMODE_READ|FMODE_WRITE|FMODE_EXCL, sb);
+	if (IS_ERR(bdev))
+		return 1;
+	blocksize = sb->s_blocksize;
+	hblock = bdev_logical_block_size(bdev);
+	len = SIMPLEFS_MAX_FILESYSTEM_OBJECTS_SUPPORTED;
+
+	journal = jbd2_journal_init_dev(bdev, sb->s_bdev, 1, -1, blocksize);
+	if (!journal) {
+		printk(KERN_ERR "Can't load journal\n");
+		return 1;
+	}
+	journal->j_private = sb;
+
+	sfs_sb->journal = journal;
+
+	return 0;
+}
+static int simplefs_sb_load_journal(struct super_block *sb, struct inode *inode)
+{
+	struct journal_s *journal;
+	struct simplefs_super_block *sfs_sb = SIMPLEFS_SB(sb);
+
+	journal = jbd2_journal_init_inode(inode);
+	if (!journal) {
+		printk(KERN_ERR "Can't load journal\n");
+		return 1;
+	}
+	journal->j_private = sb;
+
+	sfs_sb->journal = journal;
+
+	return 0;
+}
+
+#define SIMPLEFS_OPT_JOURNAL_DEV 1
+#define SIMPLEFS_OPT_JOURNAL_PATH 2
+static const match_table_t tokens = {
+	{SIMPLEFS_OPT_JOURNAL_DEV, "journal_dev=%u"},
+	{SIMPLEFS_OPT_JOURNAL_PATH, "journal_path=%s"},
+};
+static int simplefs_parse_options(struct super_block *sb, char *options)
+{
+	substring_t args[MAX_OPT_ARGS];
+	int token, ret, arg;
+	char *p;
+
+	while ((p = strsep(&options, ",")) != NULL) {
+		if (!*p)
+			continue;
+
+		args[0].to = args[0].from = NULL;
+		token = match_token(p, tokens, args);
+
+		switch (token) {
+			case SIMPLEFS_OPT_JOURNAL_DEV:
+				if (args->from && match_int(args, &arg))
+					return 1;
+				printk(KERN_INFO "Loading journal devnum: %i\n", arg);
+				if ((ret = simplefs_load_journal(sb, arg)))
+					return ret;
+				break;
+
+			case SIMPLEFS_OPT_JOURNAL_PATH:
+			{
+				char *journal_path;
+				struct inode *journal_inode;
+				struct path path;
+
+				BUG_ON(!(journal_path = match_strdup(&args[0])));
+				ret = kern_path(journal_path, LOOKUP_FOLLOW, &path);
+				if (ret) {
+					printk(KERN_ERR "could not find journal device path: error %d\n", ret);
+					kfree(journal_path);
+				}
+
+				journal_inode = path.dentry->d_inode;
+
+				path_put(&path);
+				kfree(journal_path);
+
+				if (S_ISBLK(journal_inode->i_mode)) {
+					unsigned long journal_devnum = new_encode_dev(journal_inode->i_rdev);
+					if ((ret = simplefs_load_journal(sb, journal_devnum)))
+						return ret;
+				} else {
+					/** Seems didn't work properly */
+					if ((ret = simplefs_sb_load_journal(sb, journal_inode)))
+						return ret;
+				}
+
+				break;
+			}
+		}
+	}
+
+	return 0;
+}
 
 /* This function, as the name implies, Makes the super_block valid and
  * fills filesystem specific information in the super block */
@@ -688,6 +848,8 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 		       "simplefs seem to be formatted using a non-standard block size.");
 		goto release;
 	}
+	/** XXX: Avoid this hack, by adding one more sb wrapper, but non-disk */
+	sb_disk->journal = NULL;
 
 	printk(KERN_INFO
 	       "simplefs filesystem of version [%llu] formatted with a block size of [%llu] detected in the device.\n",
@@ -728,7 +890,18 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 		goto release;
 	}
 
-	ret = 0;
+	if ((ret = simplefs_parse_options(sb, data)))
+		goto release;
+
+	if (!sb_disk->journal) {
+		struct inode *journal_inode;
+		journal_inode = simplefs_iget(sb, SIMPLEFS_JOURNAL_INODE_NUMBER);
+
+		ret = simplefs_sb_load_journal(sb, journal_inode);
+		goto release;
+	}
+	ret = jbd2_journal_load(sb_disk->journal);
+
 release:
 	brelse(bh);
 

@@ -15,10 +15,18 @@
 
 set -e
 
+echo 1 >| /sys/module/jbd2/parameters/jbd2_debug
+
 root_pwd="$PWD"
 test_dir="test-dir-$RANDOM"
 test_mount_point="test-mount-point-$RANDOM"
+test_journal_dev=""
 
+function create_journal()
+{
+    dd bs=1M count=10 if=/dev/zero of="$1"
+    mke2fs -b 4096 -O journal_dev "$1"
+}
 function create_test_image()
 {
     dd bs=4096 count=100 if=/dev/zero of="$1"
@@ -27,12 +35,14 @@ function create_test_image()
 function mount_fs_image()
 {
     insmod simplefs.ko
-    mount -o loop,owner,group,users -t simplefs "$1" "$2"
+    test_journal_dev=$(losetup -f --show "$1")
+    mount -o loop,owner,group,users,journal_path="$test_journal_dev" -t simplefs "$2" "$3"
     dmesg | tail -n20
 }
 function unmount_fs()
 {
     umount "$1"
+    losetup -d $test_journal_dev
     rmmod simplefs.ko
     dmesg | tail -n20
 }
@@ -106,15 +116,16 @@ cleanup
 trap cleanup SIGINT EXIT
 mkdir "$test_dir" "$test_mount_point"
 create_test_image "$test_dir/image"
+create_journal "$test_dir/journal"
 
 # 1
-mount_fs_image "$test_dir/image" "$test_mount_point"
+mount_fs_image "$test_dir/journal" "$test_dir/image" "$test_mount_point"
 do_some_operations "$test_mount_point"
 cd "$root_pwd"
 unmount_fs "$test_mount_point"
 
 # 2
-mount_fs_image "$test_dir/image" "$test_mount_point"
+mount_fs_image "$test_dir/journal" "$test_dir/image" "$test_mount_point"
 do_read_operations "$test_mount_point"
 cd "$root_pwd"
 unmount_fs "$test_mount_point"
