@@ -522,7 +522,7 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 
 	inode->i_sb = sb;
 	inode->i_op = &simplefs_inode_ops;
-	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+	inode->i_atime = inode->i_mtime = inode->i_ctime = current_time(inode);
 	inode->i_ino = (count + SIMPLEFS_START_INO - SIMPLEFS_RESERVED_INODES + 1);
 
 	sfs_inode = kmem_cache_alloc(sfs_inode_cachep, GFP_KERNEL);
