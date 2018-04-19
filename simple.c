@@ -21,6 +21,7 @@
 
 #include "super.h"
 
+#define f_dentry f_path.dentry
 /* A super block lock that must be used for any critical section operation on the sb,
  * such as: updating the free_blocks, inodes_count etc. */
 static DEFINE_MUTEX(simplefs_sb_lock);
