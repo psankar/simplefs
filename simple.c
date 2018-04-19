@@ -639,7 +639,7 @@ static struct inode *simplefs_iget(struct super_block *sb, int ino)
 
 	/* FIXME: We should store these times to disk and retrieve them */
 	inode->i_atime = inode->i_mtime = inode->i_ctime =
-			CURRENT_TIME;
+			current_time(inode);
 
 	inode->i_private = sfs_inode;
 
@@ -875,7 +875,7 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
 	root_inode->i_op = &simplefs_inode_ops;
 	root_inode->i_fop = &simplefs_dir_operations;
 	root_inode->i_atime = root_inode->i_mtime = root_inode->i_ctime =
-	    CURRENT_TIME;
+	    current_time(root_inode);
 
 	root_inode->i_private =
 	    simplefs_get_inode(sb, SIMPLEFS_ROOTDIR_INODE_NUMBER);
