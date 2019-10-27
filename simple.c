@@ -43,7 +43,7 @@ static struct kmem_cache *sfs_inode_cachep;
 
 void simplefs_sb_sync(struct super_block *vsb)
 {
-	struct buffer_head *bh;
+	struct buffer_head *bh = NULL;
 	struct simplefs_super_block *sb = SIMPLEFS_SB(vsb);
 
 	bh = sb_bread(vsb, SIMPLEFS_SUPERBLOCK_BLOCK_NUMBER);
@@ -76,8 +76,8 @@ struct simplefs_inode *simplefs_inode_search(struct super_block *sb,
 void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 {
 	struct simplefs_super_block *sb = SIMPLEFS_SB(vsb);
-	struct buffer_head *bh;
-	struct simplefs_inode *inode_iterator;
+	struct buffer_head *bh = NULL;
+	struct simplefs_inode *inode_iterator = NULL;
 
 	if (mutex_lock_interruptible(&simplefs_inodes_mgmt_lock)) {
 		sfs_trace("Failed to acquire mutex lock\n");
