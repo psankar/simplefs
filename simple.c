@@ -504,7 +504,7 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 	}
 
 	if (unlikely(count >= SIMPLEFS_MAX_FILESYSTEM_OBJECTS_SUPPORTED)) {
-		/* The above condition can be just == insted of the >= */
+		/* The above condition can be just == instead of the >= */
 		printk(KERN_ERR
 		       "Maximum number of objects supported by simplefs is already reached");
 		mutex_unlock(&simplefs_directory_children_update_lock);
