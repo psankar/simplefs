@@ -691,7 +691,7 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 /**
  * Simplest
  */
-void simplefs_destory_inode(struct inode *inode)
+void simplefs_destroy_inode(struct inode *inode)
 {
 	struct simplefs_inode *sfs_inode = SIMPLEFS_INODE(inode);
 
@@ -709,7 +709,7 @@ static void simplefs_put_super(struct super_block *sb)
 }
 
 static const struct super_operations simplefs_sops = {
-	.destroy_inode = simplefs_destory_inode,
+	.destroy_inode = simplefs_destroy_inode,
 	.put_super = simplefs_put_super,
 };
 
