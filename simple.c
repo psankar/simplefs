@@ -963,7 +963,7 @@ static int simplefs_init(void)
 
 	ret = register_filesystem(&simplefs_fs_type);
 	if (likely(ret == 0))
-		printk(KERN_INFO "Sucessfully registered simplefs\n");
+		printk(KERN_INFO "Successfully registered simplefs\n");
 	else
 		printk(KERN_ERR "Failed to register simplefs. Error:[%d]", ret);
 
@@ -978,7 +978,7 @@ static void simplefs_exit(void)
 	kmem_cache_destroy(sfs_inode_cachep);
 
 	if (likely(ret == 0))
-		printk(KERN_INFO "Sucessfully unregistered simplefs\n");
+		printk(KERN_INFO "Successfully unregistered simplefs\n");
 	else
 		printk(KERN_ERR "Failed to unregister simplefs. Error:[%d]",
 		       ret);
